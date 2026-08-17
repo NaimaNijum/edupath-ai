@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from fastapi import HTTPException
 from sqlalchemy import text
 
 from app.database.session import AsyncSessionLocal
@@ -19,9 +20,9 @@ async def health() -> dict:
         }
 
     except Exception as exc:
-        return {
-            "status": "healthy",
+        raise HTTPException(status_code=503, detail={
+            "status": "unhealthy",
             "service": "edupath-api",
             "database": "unhealthy",
-            "database_error": str(exc),
-        }
+            "database_error": "database check failed",
+        }) from exc

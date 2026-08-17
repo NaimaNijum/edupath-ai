@@ -1,7 +1,26 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.routes.health import router as health_router
+from app.api.routes.memory import router as memory_router
+from app.api.routes.opportunities import router as opportunities_router
+from app.api.routes.profiles import router as profiles_router
+from app.api.routes.sop import router as sop_router
+from app.api.routes.workflows import router as workflows_router
+from app.core.config import settings
+from app.core.exceptions import (
+    EduPathError,
+    LLMError,
+    LLMQuotaError,
+    ToolError,
+    WorkflowError,
+)
+from app.core.logging import configure_logging, get_logger
 
+configure_logging(settings.log_level)
+logger = get_logger(component="api")
 
 app = FastAPI(
     title="EduPath AI API",
@@ -9,4 +28,64 @@ app = FastAPI(
     version="0.1.0",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.exception_handler(EduPathError)
+async def edupath_error_handler(request: Request, exc: EduPathError) -> JSONResponse:
+    if isinstance(exc, LLMQuotaError):
+        # Quota exhaustion is a recoverable, well-understood condition: surface
+        # a clean, user-safe message plus enough structured detail for the
+        # client to back off, without leaking the raw provider stack trace.
+        retry_after = int(exc.retry_after) if exc.retry_after else 30
+        logger.warning(
+            "llm_quota_exhausted",
+            path=request.url.path,
+            provider=exc.provider,
+            model=exc.model,
+            retry_after=retry_after,
+        )
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": "AI service quota temporarily exhausted. Please try again later.",
+                "type": exc.__class__.__name__,
+                "provider": exc.provider,
+                "model": exc.model,
+                "status_code": exc.status_code or 429,
+                "retry_after": retry_after,
+            },
+            headers={"Retry-After": str(retry_after)},
+        )
+    if isinstance(exc, (LLMError, ToolError)):
+        logger.warning("external_dependency_failure", path=request.url.path, error_type=exc.__class__.__name__)
+        return JSONResponse(status_code=503, content={"detail": "An external service is currently unavailable", "type": exc.__class__.__name__})
+    if isinstance(exc, WorkflowError):
+        logger.exception("workflow_failure", path=request.url.path, error_type=exc.__class__.__name__)
+        return JSONResponse(status_code=500, content={"detail": "Workflow execution failed", "type": exc.__class__.__name__})
+    return JSONResponse(status_code=400, content={"detail": str(exc), "type": exc.__class__.__name__})
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"detail": exc.errors(), "type": "ValidationError"})
+
+
+@app.exception_handler(Exception)
+async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("unhandled_request_error", path=request.url.path, error_type=exc.__class__.__name__)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error", "type": "InternalServerError"})
+
+
 app.include_router(health_router)
+app.include_router(profiles_router, prefix="/api/v1")
+app.include_router(opportunities_router, prefix="/api/v1")
+app.include_router(memory_router, prefix="/api/v1")
+app.include_router(sop_router, prefix="/api/v1")
+app.include_router(workflows_router, prefix="/api/v1")
