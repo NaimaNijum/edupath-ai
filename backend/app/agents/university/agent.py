@@ -4,8 +4,9 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
-from app.agents.context import ensure_llm_budget, grounded_context
+from app.agents.context import candidates_from_tool_results, ensure_llm_budget, grounded_context
 from app.core.config import settings
+from app.core.exceptions import LLMError, LLMQuotaError
 from app.llm.gemini import get_gemini_provider
 from app.llm.usage import serialize_usage
 from app.schemas.agent import AgentMessage, AgentResult
@@ -29,6 +30,8 @@ def build_university_agent(provider=None):
         started_at = datetime.now(UTC)
         call_number, call_context = ensure_llm_budget(state, agent_name="university_agent", purpose="university_discovery")
 
+        candidates = candidates_from_tool_results(state, {"university_search", "opportunity_search"}, created_by="university_agent")
+
         prompt = f"""
 You are EduPath AI's University Discovery Agent.
 
@@ -39,17 +42,40 @@ Student request:
 
 Profile context:
 {profile}
-{grounded_context(state, {"university_search", "web_search"})}
+{grounded_context(state, {"university_search", "opportunity_search", "web_search"})}
+
+{len(candidates)} candidate universities/programs were found via database/search tools (already
+extracted separately -- do not restate them as structured data). Summarize what was found and
+whether it looks like a good fit. If zero candidates were found, say so plainly instead of
+inventing any.
 
 Return JSON with summary, key_findings, recommended_next_agent, supervisor_message, next_agent_message, confidence.
 """
 
-        structured, raw_result = provider.generate_structured(
-            prompt,
-            response_model=UniversityAgentOutput,
-            model=settings.gemini_model,
-            context=call_context,
-        )
+        try:
+            structured, raw_result = provider.generate_structured(
+                prompt,
+                response_model=UniversityAgentOutput,
+                model=settings.gemini_model,
+                context=call_context,
+            )
+        except LLMQuotaError:
+            raise
+        except LLMError as exc:
+            error_message = f"University agent failed during LLM call: {exc}"
+            return {
+                "errors": [error_message],
+                "llm_call_count": call_number,
+                "candidate_opportunities": candidates,
+                "agent_messages": [
+                    AgentMessage(
+                        sender="university_agent",
+                        receiver="supervisor",
+                        message_type="error",
+                        content=f"Failed to generate university analysis. Reason: {exc}",
+                    )
+                ],
+            }
         completed_at = datetime.now(UTC)
 
         result = AgentResult(
@@ -69,6 +95,7 @@ Return JSON with summary, key_findings, recommended_next_agent, supervisor_messa
 
         return {
             "university_research": structured.model_dump(),
+            "candidate_opportunities": candidates,
             "agent_results": [result],
             "llm_call_count": call_number,
             "agent_messages": [

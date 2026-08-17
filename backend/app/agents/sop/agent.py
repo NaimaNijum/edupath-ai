@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.agents.context import ensure_llm_budget
 from app.core.config import settings
+from app.core.exceptions import LLMError, LLMQuotaError
 from app.llm.gemini import get_gemini_provider
 from app.llm.usage import serialize_usage
 from app.schemas.agent import AgentMessage, AgentResult
@@ -43,12 +44,29 @@ Profile context:
 Return JSON with summary, key_findings, recommended_next_agent, supervisor_message, next_agent_message, confidence.
 """
 
-        structured, raw_result = provider.generate_structured(
-            prompt,
-            response_model=SOPAgentOutput,
-            model=settings.gemini_model,
-            context=call_context,
-        )
+        try:
+            structured, raw_result = provider.generate_structured(
+                prompt,
+                response_model=SOPAgentOutput,
+                model=settings.gemini_model,
+                context=call_context,
+            )
+        except LLMQuotaError:
+            raise
+        except LLMError as exc:
+            error_message = f"SOP agent failed during LLM call: {exc}"
+            return {
+                "errors": [error_message],
+                "llm_call_count": call_number,
+                "agent_messages": [
+                    AgentMessage(
+                        sender="sop_agent",
+                        receiver="supervisor",
+                        message_type="error",
+                        content=f"Failed to generate SOP guidance. Reason: {exc}",
+                    )
+                ],
+            }
         completed_at = datetime.now(UTC)
 
         result = AgentResult(

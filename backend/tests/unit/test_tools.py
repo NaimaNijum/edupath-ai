@@ -40,6 +40,7 @@ class FakeOpportunity:
         self.application_url = "https://example.com/apply"
         self.source_url = "https://example.com/source"
         self.description = "Test opportunity"
+        self.deadline = None
 
 
 class FakeUniversityRepository:

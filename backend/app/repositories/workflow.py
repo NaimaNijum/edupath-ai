@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import desc, select
+from sqlalchemy import delete, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.entities import AgentExecution, AgentMessage, WorkflowExecution
@@ -59,18 +59,31 @@ class WorkflowRepository:
         response,
         *,
         raw_state: dict[str, Any],
-        completed_at: datetime,
+        completed_at: datetime | None,
     ) -> None:
+        """Persist a workflow's current state. `completed_at=None` means the
+        workflow is paused (e.g. awaiting human approval), not finished --
+        the caller is expected to call this again once it resumes.
+
+        `raw_state["agent_results"]`/`agent_messages"]` always hold the full
+        accumulated history for the run (LangGraph's append reducers never
+        drop earlier entries), so this call is idempotent: it replaces this
+        workflow's AgentExecution/AgentMessage rows wholesale each time,
+        rather than risking duplicate rows across a pause + resume.
+        """
         workflow = await session.get(WorkflowExecution, workflow_id)
         if workflow is None:
             return
 
         workflow.status = response.workflow_status
         workflow.completed_at = completed_at
-        workflow.result = response.model_dump()
+        workflow.result = response.model_dump(mode="json")
         workflow.token_usage = response.token_usage
         workflow.estimated_cost_usd = response.estimated_cost_usd
         workflow.error = None
+
+        await session.execute(delete(AgentExecution).where(AgentExecution.workflow_id == workflow_id))
+        await session.execute(delete(AgentMessage).where(AgentMessage.workflow_id == workflow_id))
 
         for agent_result in raw_state.get("agent_results", []):
             session.add(
@@ -81,7 +94,7 @@ class WorkflowRepository:
                     started_at=agent_result.started_at,
                     completed_at=agent_result.completed_at,
                     input={"user_request": workflow.user_request, "workflow_type": workflow.workflow_type},
-                    output=agent_result.model_dump(),
+                    output=agent_result.model_dump(mode="json"),
                     token_usage=agent_result.token_usage,
                     estimated_cost=agent_result.estimated_cost_usd,
                     error=None,
@@ -120,6 +133,15 @@ class WorkflowRepository:
 
     async def get_workflow_execution(self, session: AsyncSession, workflow_id: UUID) -> WorkflowExecution | None:
         return await session.get(WorkflowExecution, workflow_id)
+
+    async def list_for_profile(self, session: AsyncSession, profile_id: UUID, limit: int = 50) -> list[WorkflowExecution]:
+        result = await session.execute(
+            select(WorkflowExecution)
+            .where(WorkflowExecution.profile_id == profile_id)
+            .order_by(desc(WorkflowExecution.started_at))
+            .limit(limit)
+        )
+        return list(result.scalars().all())
 
     async def update_workflow_status(self, session: AsyncSession, workflow_id: UUID, status: str) -> WorkflowExecution | None:
         workflow = await session.get(WorkflowExecution, workflow_id)

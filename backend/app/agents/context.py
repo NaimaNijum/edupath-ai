@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import re
+from datetime import UTC, datetime
 
 from app.core.config import settings
 from app.core.exceptions import LLMQuotaError
 from app.core.logging import get_logger
 from app.llm.gemini import LLMCallContext
+from app.schemas.opportunity_candidate import CandidateOpportunity, Evidence
 
 _logger = get_logger(component="workflow_budget")
 
@@ -66,3 +69,90 @@ Use supplied tool results as the factual source. Do not invent scholarships, pro
 universities, deadlines, funding amounts, or eligibility requirements. If evidence is
 insufficient, say verification is required.
 """
+
+
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _slugify(text: str) -> str:
+    slug = _SLUG_RE.sub("-", text.lower()).strip("-")
+    return slug or "candidate"
+
+
+def candidates_from_tool_results(state: dict, tool_names: set[str], created_by: str) -> list[CandidateOpportunity]:
+    """Deterministically build CandidateOpportunity entries straight from
+    already-fetched tool_results (real DB rows / real search hits).
+
+    This intentionally does NOT ask the LLM to generate structured candidate
+    data: ids, URLs, and metadata all come directly from the tool's own
+    output, so a candidate can never be fabricated by the model. Agents only
+    use the LLM to narrate/summarize what was found here.
+    """
+    candidates: list[CandidateOpportunity] = []
+    for tool_result in state.get("tool_results", []):
+        if tool_result.get("tool_name") not in tool_names:
+            continue
+        for result in tool_result.get("results", []):
+            metadata = result.get("metadata") or {}
+            source = result.get("source") or {}
+            title = result.get("title") or "Untitled"
+            university = metadata.get("university")
+            retrieved_at = source.get("retrieved_at")
+            if not isinstance(retrieved_at, datetime):
+                retrieved_at = datetime.now(UTC)
+
+            research_areas: list[str] = []
+            if metadata.get("research_interests"):
+                research_areas = list(metadata["research_interests"])
+            elif metadata.get("field"):
+                research_areas = [metadata["field"]]
+
+            candidates.append(
+                CandidateOpportunity(
+                    id=_slugify(f"{title}-{university or tool_result.get('tool_name')}"),
+                    title=title,
+                    university=university,
+                    degree_level=metadata.get("degree_level"),
+                    country=metadata.get("country"),
+                    professor_name=title if tool_result.get("tool_name") == "professor_search" else None,
+                    research_areas=research_areas,
+                    funding_type=metadata.get("funding_type"),
+                    deadline=metadata.get("deadline"),
+                    official_url=source.get("url"),
+                    evidence=[
+                        Evidence(
+                            claim=result.get("description") or title,
+                            source_url=source.get("url"),
+                            source_title=title,
+                            source_type="database" if source.get("source") == "postgresql" else "web_search",
+                            verified=bool(source.get("url")),
+                            retrieved_at=retrieved_at,
+                        )
+                    ],
+                    created_by=created_by,
+                )
+            )
+    return candidates
+
+
+def summarize_candidates(candidates: list[CandidateOpportunity]) -> str:
+    """Compact, token-cheap representation of candidates for enrichment-agent
+    prompts (eligibility/research-match/verification) -- omits evidence to
+    keep prompts small; evidence stays in state for the frontend."""
+    if not candidates:
+        return "[]"
+    compact = [
+        {
+            "id": c.id,
+            "title": c.title,
+            "university": c.university,
+            "degree_level": c.degree_level,
+            "country": c.country,
+            "professor_name": c.professor_name,
+            "research_areas": c.research_areas,
+            "funding_type": c.funding_type,
+            "deadline": c.deadline,
+        }
+        for c in candidates
+    ]
+    return json.dumps(compact, default=str)

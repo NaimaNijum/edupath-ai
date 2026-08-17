@@ -2,6 +2,8 @@ from app.database.models.entities import (
     AgentExecution,
     AgentMessage,
     Application,
+    Document,
+    DocumentChunk,
     Memory,
     Opportunity,
     Professor,
@@ -9,5 +11,6 @@ from app.database.models.entities import (
     SOPDocument,
     StudentProfile,
     University,
+    User,
     WorkflowExecution,
 )

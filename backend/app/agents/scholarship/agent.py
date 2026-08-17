@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
-from app.agents.context import ensure_llm_budget, grounded_context
+from app.agents.context import candidates_from_tool_results, ensure_llm_budget, grounded_context
 from app.core.config import settings
 from app.core.exceptions import LLMError, LLMQuotaError
 from app.llm.gemini import get_gemini_provider
@@ -29,6 +29,8 @@ def build_scholarship_agent(provider=None):
         started_at = datetime.now(UTC)
         call_number, call_context = ensure_llm_budget(state, agent_name="scholarship_agent", purpose="scholarship_research")
 
+        candidates = candidates_from_tool_results(state, {"opportunity_search"}, created_by="scholarship_agent")
+
         prompt = f"""
 You are EduPath AI's Scholarship Research Agent.
 
@@ -37,6 +39,10 @@ Analyze the funding signal in the student's request.
 Student request:
 {user_request}
 {grounded_context(state, {"opportunity_search", "web_search"})}
+
+{len(candidates)} candidate funding opportunities were found via database/search tools (already
+extracted separately -- do not restate them as structured data). If zero candidates were found,
+say so plainly instead of inventing any.
 
 Return JSON with:
 - summary
@@ -64,6 +70,7 @@ Return JSON with:
             return {
                 "errors": [error_message],
                 "llm_call_count": call_number,
+                "candidate_opportunities": candidates,
                 "agent_messages": [
                     AgentMessage(
                         sender="scholarship_agent",
@@ -93,6 +100,7 @@ Return JSON with:
 
         return {
             "scholarship_research": structured.model_dump(),
+            "candidate_opportunities": candidates,
             "agent_results": [result],
             "llm_call_count": call_number,
             "agent_messages": [

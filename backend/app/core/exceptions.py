@@ -49,3 +49,13 @@ class ToolError(EduPathError):
 
 class WorkflowError(EduPathError):
     """Raised when the LangGraph workflow cannot proceed."""
+
+
+class AuthenticationError(EduPathError):
+    """Raised when a request's bearer token is missing, invalid, expired, or
+    revoked."""
+
+
+class AuthDisabledError(EduPathError):
+    """Raised when dev-mock login is attempted while real Google OAuth is
+    configured (dev-mock is only ever a fallback, never a bypass)."""

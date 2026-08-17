@@ -13,8 +13,8 @@ class ProfileService:
     def __init__(self, repository: ProfileRepository | None = None) -> None:
         self._repository = repository or ProfileRepository()
 
-    async def create(self, session: AsyncSession, request: StudentProfileCreate) -> StudentProfileRead:
-        profile = StudentProfile(**request.model_dump())
+    async def create(self, session: AsyncSession, request: StudentProfileCreate, *, user_id: UUID | None = None) -> StudentProfileRead:
+        profile = StudentProfile(**request.model_dump(), user_id=user_id)
         saved = await self._repository.create(session, profile)
         return StudentProfileRead.model_validate(saved)
 

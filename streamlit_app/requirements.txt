@@ -1,0 +1,4 @@
+# >=1.61 required for st.dialog, st.pills, and multiselect(accept_new_options=...)
+streamlit>=1.61
+requests>=2.31
+python-dotenv>=1.0

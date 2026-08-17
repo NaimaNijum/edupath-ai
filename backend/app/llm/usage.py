@@ -23,9 +23,9 @@ def serialize_usage(usage: Any) -> dict[str, float | int | bool]:
 
 
 _MODEL_PRICING = {
-    "gemini-3.6-flash": {
-        "input_per_1m": 0.35,
-        "output_per_1m": 1.05,
+    "gemini-2.5-flash-lite": {
+        "input_per_1m": 0.10,
+        "output_per_1m": 0.40,
     },
 }
 

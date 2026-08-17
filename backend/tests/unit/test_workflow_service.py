@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -8,7 +9,7 @@ import pytest
 
 from app.schemas.agent import AgentMessage, AgentResult
 from app.schemas.workflow import WorkflowCreateRequest
-from app.services.workflow import WorkflowService
+from app.services.workflow import WorkflowNotResumableError, WorkflowService
 
 
 @dataclass
@@ -16,6 +17,9 @@ class FakeWorkflowRecord:
     id: UUID
     user_request: str
     workflow_type: str
+    profile_id: UUID | None = None
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    status: str = "running"
 
 
 class FakeGraph:
@@ -73,9 +77,14 @@ class FakeRepository:
         self.saved_response = response
         self.saved_raw_state = raw_state
         self.saved_workflow_id = workflow_id
+        if self.created is not None:
+            self.created.status = response.workflow_status
 
     async def fail_workflow_execution(self, session, workflow_id, error, *, completed_at):
         self.failed_error = error
+
+    async def get_workflow_execution(self, session, workflow_id):
+        return self.created
 
     def summarize_token_usage(self, agent_results):
         total_input = sum(int(result.token_usage.get("input_tokens", 0)) for result in agent_results)
@@ -145,5 +154,125 @@ async def test_workflow_service_persists_execution_and_records() -> None:
     assert graph.last_state["workflow_type"] == "opportunity_discovery"
     assert graph.last_state["memory_references"]
     assert graph.last_state["tool_results"]
+
+
+class FakeInterruptingGraph:
+    """Simulates approval_gate pausing on the first invoke() and completing
+    on a Command(resume=...) invoke() -- mirrors real LangGraph's interrupt
+    contract (a __interrupt__ key with .value payloads) without needing a
+    real graph/checkpointer in this unit test."""
+
+    def __init__(self) -> None:
+        self.calls: list = []
+
+    def invoke(self, graph_input):
+        self.calls.append(graph_input)
+        is_resume = not isinstance(graph_input, dict)
+
+        base_agent_result = AgentResult(
+            agent_name="profile_agent",
+            summary="Profile matched.",
+            supervisor_message="Profile ready.",
+            token_usage={"input_tokens": 10, "output_tokens": 20, "total_tokens": 30},
+            estimated_cost_usd=0.00001,
+        )
+
+        if not is_resume:
+            return {
+                "workflow_status": "running",
+                "execution_plan": ["profile_agent", "approval_gate", "sop_agent"],
+                "plan_index": 2,
+                "next_agent": "approval_gate",
+                "agent_results": [base_agent_result],
+                "agent_messages": [AgentMessage(sender="supervisor", receiver="profile_agent", message_type="handoff", content="start")],
+                "errors": [],
+                "candidate_opportunities": [],
+                "ranked_opportunities": [],
+                "__interrupt__": [SimpleNamespace(value={"type": "opportunity_approval", "ranked_opportunities": []})],
+            }
+
+        sop_result = AgentResult(
+            agent_name="sop_agent",
+            summary="SOP guidance ready.",
+            supervisor_message="Done.",
+            token_usage={"input_tokens": 5, "output_tokens": 5, "total_tokens": 10},
+            estimated_cost_usd=0.000005,
+        )
+        return {
+            "workflow_status": "completed",
+            "execution_plan": ["profile_agent", "approval_gate", "sop_agent"],
+            "plan_index": 3,
+            "next_agent": "__end__",
+            "approval_status": "approved",
+            "agent_results": [base_agent_result, sop_result],
+            "agent_messages": [
+                AgentMessage(sender="supervisor", receiver="profile_agent", message_type="handoff", content="start"),
+                AgentMessage(sender="approval_gate", receiver="supervisor", message_type="approval", content="Human decision: approve"),
+            ],
+            "final_response": "Done",
+            "errors": [],
+            "candidate_opportunities": [],
+            "ranked_opportunities": [],
+        }
+
+
+@pytest.mark.asyncio
+async def test_workflow_service_execute_detects_interrupt_and_pauses() -> None:
+    graph = FakeInterruptingGraph()
+    repository = FakeRepository()
+    service = WorkflowService(repository=repository, graph=graph, memory_service=FakeMemoryService(), tooling_service=FakeToolingService())
+    session = SimpleNamespace()
+
+    response = await service.execute(
+        session,
+        WorkflowCreateRequest(user_request="I want a funded PhD in AI, and approve my top choice for an SOP.", student_profile_id=None),
+    )
+
+    assert response.workflow_status == "awaiting_approval"
+    assert response.pending_approval == {"type": "opportunity_approval", "ranked_opportunities": []}
+    assert response.completed_at is None
+    assert repository.created.status == "awaiting_approval"
+    # Only the pre-interrupt agent ran; sop_agent has not executed yet.
+    assert [r.agent_name for r in response.agent_results] == ["profile_agent"]
+
+
+@pytest.mark.asyncio
+async def test_workflow_service_resume_completes_paused_workflow() -> None:
+    graph = FakeInterruptingGraph()
+    repository = FakeRepository()
+    service = WorkflowService(repository=repository, graph=graph, memory_service=FakeMemoryService(), tooling_service=FakeToolingService())
+    session = SimpleNamespace()
+
+    paused = await service.execute(
+        session,
+        WorkflowCreateRequest(user_request="I want a funded PhD in AI, and approve my top choice for an SOP.", student_profile_id=None),
+    )
+    assert paused.workflow_status == "awaiting_approval"
+
+    resumed = await service.resume(session, repository.created.id, decision="approve", opportunity_id="stanford-cs-phd")
+
+    assert resumed.workflow_status == "completed"
+    assert resumed.completed_at is not None
+    assert resumed.approval_status == "approved"
+    assert [r.agent_name for r in resumed.agent_results] == ["profile_agent", "sop_agent"]
+    # Command(resume=...) was actually passed through on the second call.
+    assert len(graph.calls) == 2
+    from langgraph.types import Command
+    assert isinstance(graph.calls[1], Command)
+    assert graph.calls[1].resume == {"decision": "approve", "opportunity_id": "stanford-cs-phd"}
+
+
+@pytest.mark.asyncio
+async def test_workflow_service_resume_rejects_when_not_awaiting_approval() -> None:
+    graph = FakeGraph()
+    repository = FakeRepository()
+    service = WorkflowService(repository=repository, graph=graph, memory_service=FakeMemoryService(), tooling_service=FakeToolingService())
+    session = SimpleNamespace()
+
+    await service.execute(session, WorkflowCreateRequest(user_request="Simple request.", student_profile_id=None))
+    assert repository.created.status == "completed"
+
+    with pytest.raises(WorkflowNotResumableError):
+        await service.resume(session, repository.created.id, decision="approve", opportunity_id=None)
 
 

@@ -7,6 +7,7 @@ from app.core.exceptions import LLMError, LLMQuotaError
 from app.graph.routing import (
     ALL_AGENTS,
     build_execution_plan,
+    ensure_approval_gate,
     synthesize_final_response,
 )
 from app.llm.gemini import get_gemini_provider
@@ -28,6 +29,19 @@ def build_supervisor_agent(provider=None):
         plan_index = int(state.get("plan_index", 0))
         call_count = int(state.get("llm_call_count", 0))
 
+        human_approval = state.get("human_approval") or {}
+        if human_approval.get("decision") == "reject":
+            # approval_gate paused, the human declined -- end here rather
+            # than continuing on to sop_agent with an opportunity nobody
+            # approved.
+            return {
+                **_complete(existing_plan, completed),
+                "workflow_status": "completed",
+                "approval_status": "rejected",
+                "current_task": "Human rejected the proposed opportunity; workflow ended without SOP generation.",
+                "llm_call_count": call_count,
+            }
+
         if existing_plan and plan_index >= len(existing_plan):
             return {**_complete(existing_plan, completed), "llm_call_count": call_count}
 
@@ -45,7 +59,11 @@ def build_supervisor_agent(provider=None):
         else:
             prompt = f"""You are the EduPath AI supervisor. Decide the execution plan for a student workflow.
 Use only these valid agents: {sorted(ALL_AGENTS)}. Return JSON matching SupervisorDecision.
-Tailor the plan; skip irrelevant agents and put verification_agent last for research claims.
+Typical order when relevant: profile_agent first; then discovery agents
+(university_agent, professor_agent, scholarship_agent) in any order; then
+eligibility_agent; then research_match_agent; then verification_agent; then
+ranking_agent; sop_agent (if requested) always last, since it should use the
+final ranked/verified candidates. Skip irrelevant agents for this request.
 Do not invent opportunities or facts.
 USER REQUEST: {request}
 STUDENT PROFILE: {json.dumps(state.get('profile', {}), default=str)}
@@ -69,6 +87,11 @@ MEMORY: {json.dumps(state.get('memory_references', []), default=str)}"""
                 plan = build_execution_plan(request)
                 reason = "Gemini unavailable; using safe fallback plan."
                 errors = errors + [f"Supervisor Gemini failure: {exc}"]
+
+            # Applied exactly once, here, when the plan is first established --
+            # never on later reuse turns, since plan_index indexes into
+            # whatever list ends up stored in state.
+            plan = ensure_approval_gate(plan)
 
         completed_names = {item.get("agent_name") for item in completed}
         index = plan_index

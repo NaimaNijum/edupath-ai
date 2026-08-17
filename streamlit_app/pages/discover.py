@@ -1,0 +1,179 @@
+from __future__ import annotations
+
+import streamlit as st
+
+from api.client import BackendError, create_workflow, list_opportunities
+from components.common import render_backend_error, section_header
+from components.empty_state import render_empty_state
+from components.header import render_page_header
+from components.opportunity_list import render_opportunity_grid, render_opportunity_toolbar
+from components.workflow_status import render_workflow_status
+
+_EXAMPLE_REQUEST = "I want fully funded PhD opportunities in AI and Machine Learning in the USA for Fall 2027."
+
+_DEGREE_OPTIONS = ["Any", "BSc", "MSc", "PhD", "Postdoctoral"]
+_FUNDING_OPTIONS = ["Any", "Fully Funded", "Partially Funded", "Self-Funded"]
+_DEADLINE_OPTIONS = ["Any timeframe", "Next 3 months", "Next 6 months", "Next 12 months"]
+_COUNTRY_OPTIONS = ["USA", "Canada", "UK", "Germany", "Australia", "Netherlands", "Sweden", "Switzerland"]
+_RESEARCH_OPTIONS = [
+    "Artificial Intelligence", "Machine Learning", "Deep Learning",
+    "Natural Language Processing", "Computer Vision", "Robotics",
+    "Data Science", "Cybersecurity", "Bioinformatics",
+]
+
+
+def render() -> None:
+    render_page_header(
+        "Find Your Next Academic Opportunity",
+        "Let EduPath AI discover opportunities that match your academic profile.",
+        eyebrow="Discover",
+    )
+
+    profile_id = st.session_state.get("profile_id")
+    if not profile_id:
+        render_empty_state(
+            "Create your profile first",
+            "EduPath AI needs your academic background and goals to run a personalized discovery search.",
+            icon="🧑‍🎓",
+            cta_label="Complete Profile",
+            cta_page="pages/profile.py",
+            key="discover-no-profile",
+        )
+        return
+
+    _render_search_panel(profile_id)
+
+    if st.session_state.get("workflow_error"):
+        render_backend_error(st.session_state["workflow_error"], key="workflow")
+
+    if st.session_state.get("workflow_result"):
+        st.divider()
+        render_workflow_status(st.session_state["workflow_result"])
+
+    st.divider()
+    _render_catalog_section()
+
+
+def _render_search_panel(profile_id: str) -> None:
+    with st.container(key="discover-search-panel", border=True):
+        user_request = st.text_area(
+            "What are you looking for?",
+            value=st.session_state.get("last_user_request") or "",
+            placeholder=_EXAMPLE_REQUEST,
+            height=100,
+        )
+
+        with st.expander("Quick filters (optional)", icon=":material/tune:"):
+            filter_cols = st.columns(2)
+            with filter_cols[0]:
+                degree = st.pills("Degree", _DEGREE_OPTIONS, default="Any", key="filter-degree")
+                funding = st.pills("Funding", _FUNDING_OPTIONS, default="Any", key="filter-funding")
+                deadline_window = st.selectbox("Deadline", _DEADLINE_OPTIONS, key="filter-deadline")
+            with filter_cols[1]:
+                countries = st.multiselect("Country", _COUNTRY_OPTIONS, key="filter-country")
+                research_areas = st.multiselect("Research Area", _RESEARCH_OPTIONS, key="filter-research")
+
+        run = st.button("✦ Discover Opportunities", type="primary", use_container_width=True)
+
+    if run:
+        request_text = user_request.strip() or _EXAMPLE_REQUEST
+        enriched_request = _compose_request(
+            request_text,
+            degree=degree,
+            funding=funding,
+            deadline_window=deadline_window,
+            countries=countries,
+            research_areas=research_areas,
+        )
+        st.session_state["last_user_request"] = user_request.strip()
+        _run_workflow(profile_id, enriched_request)
+
+
+def _compose_request(base_request: str, *, degree: str, funding: str, deadline_window: str, countries: list[str], research_areas: list[str]) -> str:
+    preferences = []
+    if degree and degree != "Any":
+        preferences.append(f"Degree: {degree}")
+    if funding and funding != "Any":
+        preferences.append(f"Funding: {funding}")
+    if deadline_window and deadline_window != "Any timeframe":
+        preferences.append(f"Deadline window: {deadline_window}")
+    if countries:
+        preferences.append(f"Countries: {', '.join(countries)}")
+    if research_areas:
+        preferences.append(f"Research areas: {', '.join(research_areas)}")
+
+    if not preferences:
+        return base_request
+    return f"{base_request}\n\nAdditional preferences -- {'; '.join(preferences)}."
+
+
+def _run_workflow(profile_id: str, user_request: str) -> None:
+    st.session_state["workflow_error"] = None
+    payload = {
+        "user_request": user_request,
+        "student_profile_id": profile_id,
+        "workflow_type": "opportunity_discovery",
+    }
+
+    with st.status("Running EduPath AI agents...", expanded=True) as status:
+        st.write(
+            "EduPath AI is coordinating several specialized agents -- profile analysis, "
+            "opportunity discovery, eligibility review, and more -- to build your results. "
+            "This step runs on the server and can take up to two minutes."
+        )
+        try:
+            result = create_workflow(payload)
+        except BackendError as error:
+            st.session_state["workflow_error"] = error
+            st.session_state["workflow_result"] = None
+            status.update(label="Discovery failed", state="error")
+            return
+
+        status.update(label="Discovery complete", state="complete")
+
+    st.session_state["workflow_result"] = result
+    st.session_state["current_workflow_id"] = result.get("workflow_id")
+    st.rerun()
+
+
+def _render_catalog_section() -> None:
+    section_header(
+        "Opportunity Catalog",
+        "Structured opportunities from EduPath AI's database -- sort and filter to explore them.",
+    )
+
+    header_cols = st.columns([5, 1])
+    with header_cols[1]:
+        refresh = st.button("Refresh", icon=":material/refresh:", use_container_width=True)
+
+    if refresh or st.session_state.get("opportunities") is None:
+        _load_catalog()
+
+    if st.session_state.get("opportunities_error"):
+        render_backend_error(st.session_state["opportunities_error"], key="catalog")
+        return
+
+    opportunities = st.session_state.get("opportunities") or []
+    if not opportunities:
+        render_empty_state(
+            "No opportunities in the catalog yet",
+            "Check back soon, or try running a discovery search above.",
+            icon="🧭",
+            key="catalog-empty",
+        )
+        return
+
+    filtered = render_opportunity_toolbar(opportunities, state_prefix="discover")
+    render_opportunity_grid(filtered, state_prefix="discover")
+
+
+def _load_catalog() -> None:
+    st.session_state["opportunities_error"] = None
+    try:
+        st.session_state["opportunities"] = list_opportunities()
+    except BackendError as error:
+        st.session_state["opportunities_error"] = error
+        st.session_state["opportunities"] = []
+
+
+render()

@@ -22,9 +22,23 @@ class UUIDMixin:
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
 
+class User(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "users"
+
+    # Null for dev-mock logins (no real Google account involved).
+    google_sub: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+
 class StudentProfile(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "student_profiles"
 
+    # Nullable: profiles created before auth existed (or without logging in)
+    # remain valid; new profiles are linked to the authenticated user when
+    # a valid session is present.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     academic_level: Mapped[str | None] = mapped_column(String(100))
@@ -106,6 +120,28 @@ class Application(UUIDMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(100), nullable=False, default="draft")
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     notes: Mapped[str | None] = mapped_column(Text)
+
+
+class Document(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "documents"
+
+    profile_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("student_profiles.id"), nullable=True, index=True)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    document_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    content_text: Mapped[str | None] = mapped_column(Text)
+
+    chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
+
+
+class DocumentChunk(UUIDMixin, Base):
+    __tablename__ = "document_chunks"
+
+    document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False, index=True)
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
+
+    document = relationship("Document", back_populates="chunks")
 
 
 class SOPDocument(UUIDMixin, TimestampMixin, Base):

@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.routes.auth import get_current_user_optional
+from app.database.models.entities import User
 from app.database.session import get_db
 from app.schemas.profile import StudentProfileCreate, StudentProfileRead, StudentProfileUpdate
 from app.services.profile import ProfileService
@@ -22,9 +24,14 @@ async def create_profile(
     request: StudentProfileCreate,
     session: AsyncSession = Depends(get_db),
     service: ProfileService = Depends(get_profile_service),
+    current_user: User | None = Depends(get_current_user_optional),
 ) -> StudentProfileRead:
+    """Auth is optional here: profiles can still be created anonymously
+    (matching the rest of the app, which doesn't require login), but a
+    profile is linked to the caller's account when a valid session is
+    presented."""
     try:
-        return await service.create(session, request)
+        return await service.create(session, request, user_id=current_user.id if current_user else None)
     except IntegrityError as exc:
         raise HTTPException(status_code=409, detail="A profile with this email already exists") from exc
 

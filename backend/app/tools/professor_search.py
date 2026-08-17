@@ -24,7 +24,11 @@ class ProfessorSearchTool:
                     retrieved_at=datetime.now(UTC),
                     confidence=0.8,
                 ),
-                metadata={"university": professor.university, "department": professor.department},
+                metadata={
+                    "university": professor.university,
+                    "department": professor.department,
+                    "research_interests": professor.research_interests,
+                },
             )
             for professor in professors
         ]

@@ -45,6 +45,7 @@ class StudentProfileUpdate(BaseModel):
 
 class StudentProfileRead(BaseModel):
     id: str
+    user_id: str | None = None
     name: str | None = None
     email: str
     academic_level: str | None = None
@@ -66,7 +67,7 @@ class StudentProfileRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    @field_validator("id", mode="before")
+    @field_validator("id", "user_id", mode="before")
     @classmethod
-    def serialize_id(cls, value: object) -> str:
-        return str(value)
+    def serialize_id(cls, value: object) -> str | None:
+        return str(value) if value is not None else None

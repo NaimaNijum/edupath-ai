@@ -102,10 +102,21 @@ class FakeProvider:
             payload = {
                 "summary": "Cross-agent reasoning is internally consistent.",
                 "key_findings": ["Profile aligns with professor search", "Funding and eligibility are consistent"],
-                "recommended_next_agent": "__end__",
+                "recommended_next_agent": "ranking_agent",
                 "supervisor_message": "The workflow is verified and ready to close.",
                 "next_agent_message": None,
                 "confidence": 0.95,
+                "evaluations": [],
+            }
+        elif name == "ResearchMatchAgentOutput":
+            payload = {
+                "summary": "Research alignment looks strong for AI-focused candidates.",
+                "key_findings": ["Interests overlap with candidate research areas"],
+                "recommended_next_agent": "verification_agent",
+                "supervisor_message": "Research match scoring complete.",
+                "next_agent_message": None,
+                "confidence": 0.82,
+                "evaluations": [],
             }
         else:
             raise AssertionError(f"Unexpected response model: {name}")
@@ -113,7 +124,86 @@ class FakeProvider:
         return response_model.model_validate(payload), FakeResult(text=response_model.model_validate(payload).model_dump_json())
 
 
-def test_workflow_runs_through_all_agents():
+def _initial_state() -> dict:
+    return {
+        "user_request": "I am a CSE student with GPA 3.7 and want a funded PhD in AI in USA.",
+        "user_input": "I am a CSE student with GPA 3.7 and want a funded PhD in AI in USA.",
+        "workflow_status": "running",
+        "approval_status": "not_required",
+        "execution_plan": [],
+        "plan_index": 0,
+        "agent_results": [],
+        "agent_messages": [],
+        "memory_references": [],
+        "tool_results": [],
+        "errors": [],
+    }
+
+
+def test_workflow_pauses_at_approval_gate_before_sop_agent():
+    """The plan includes sop_agent, so approval_gate must genuinely pause
+    execution before it -- with no checkpointer, the graph can still run
+    once (degrading gracefully) but cannot be resumed."""
+    graph = build_graph(provider=FakeProvider())  # checkpointer=None by default
+
+    result = graph.invoke(_initial_state())
+
+    assert "__interrupt__" in result
+    assert result["workflow_status"] == "running"  # not "completed" -- genuinely paused
+    ran_agents = [item.agent_name for item in result["agent_results"]]
+    assert ran_agents == ["profile_agent", "professor_agent", "university_agent", "scholarship_agent", "eligibility_agent"]
+    assert "sop_agent" not in ran_agents
+    interrupt_payload = result["__interrupt__"][0].value
+    assert interrupt_payload["type"] == "opportunity_approval"
+
+
+def test_workflow_resumes_through_approval_gate_to_completion():
+    """With a real checkpointer, approve resumes the SAME paused run and it
+    completes through sop_agent and verification_agent."""
+    from langgraph.checkpoint.memory import MemorySaver
+    from langgraph.types import Command
+
+    checkpointer = MemorySaver()
+    graph = build_graph(provider=FakeProvider(), checkpointer=checkpointer)
+    config = {"configurable": {"thread_id": "resume-test-thread"}}
+
+    paused = graph.invoke(_initial_state(), config)
+    assert "__interrupt__" in paused
+    assert paused["workflow_status"] == "running"
+
+    result = graph.invoke(Command(resume={"decision": "approve", "opportunity_id": None}), config)
+
+    assert "__interrupt__" not in result
+    assert result["workflow_status"] == "completed"
+    assert result["next_agent"] == "__end__"
+    assert result["approval_status"] == "approved"
+    ran_agents = [item.agent_name for item in result["agent_results"]]
+    assert ran_agents == [
+        "profile_agent", "professor_agent", "university_agent", "scholarship_agent",
+        "eligibility_agent", "sop_agent", "verification_agent",
+    ]
+    assert any(message.sender == "approval_gate" for message in result["agent_messages"])
+
+
+def test_workflow_rejection_ends_without_sop_agent():
+    from langgraph.checkpoint.memory import MemorySaver
+    from langgraph.types import Command
+
+    checkpointer = MemorySaver()
+    graph = build_graph(provider=FakeProvider(), checkpointer=checkpointer)
+    config = {"configurable": {"thread_id": "reject-test-thread"}}
+
+    graph.invoke(_initial_state(), config)
+    result = graph.invoke(Command(resume={"decision": "reject", "opportunity_id": None}), config)
+
+    assert result["workflow_status"] == "completed"
+    assert result["approval_status"] == "rejected"
+    ran_agents = [item.agent_name for item in result["agent_results"]]
+    assert "sop_agent" not in ran_agents
+    assert "verification_agent" not in ran_agents
+
+
+def test_workflow_runs_through_research_match_and_ranking_agents():
     graph = build_graph(provider=FakeProvider())
 
     result = graph.invoke(
@@ -122,7 +212,14 @@ def test_workflow_runs_through_all_agents():
             "user_input": "I am a CSE student with GPA 3.7 and want a funded PhD in AI in USA.",
             "workflow_status": "running",
             "approval_status": "not_required",
-            "execution_plan": [],
+            "execution_plan": [
+                "profile_agent",
+                "university_agent",
+                "eligibility_agent",
+                "research_match_agent",
+                "verification_agent",
+                "ranking_agent",
+            ],
             "plan_index": 0,
             "agent_results": [],
             "agent_messages": [],
@@ -133,18 +230,19 @@ def test_workflow_runs_through_all_agents():
     )
 
     assert result["workflow_status"] == "completed"
-    assert result["next_agent"] == "__end__"
-    assert len(result["agent_results"]) == 7
     assert [item.agent_name for item in result["agent_results"]] == [
         "profile_agent",
-        "professor_agent",
         "university_agent",
-        "scholarship_agent",
         "eligibility_agent",
-        "sop_agent",
+        "research_match_agent",
         "verification_agent",
+        "ranking_agent",
     ]
-    assert any(message.sender == "verification_agent" for message in result["agent_messages"])
+    # No tool_results were seeded, so there are no real candidates to rank --
+    # the ranking agent must handle that honestly (empty list) rather than
+    # fabricating an opportunity out of nowhere.
+    assert result["ranked_opportunities"] == []
+    assert any(message.sender == "ranking_agent" for message in result["agent_messages"])
 
 
 from app.agents.profile.agent import build_profile_agent, ProfileAgentOutput

@@ -3,14 +3,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.router import api_router
 from app.api.routes.health import router as health_router
-from app.api.routes.memory import router as memory_router
-from app.api.routes.opportunities import router as opportunities_router
-from app.api.routes.profiles import router as profiles_router
-from app.api.routes.sop import router as sop_router
-from app.api.routes.workflows import router as workflows_router
 from app.core.config import settings
 from app.core.exceptions import (
+    AuthDisabledError,
+    AuthenticationError,
     EduPathError,
     LLMError,
     LLMQuotaError,
@@ -63,6 +61,10 @@ async def edupath_error_handler(request: Request, exc: EduPathError) -> JSONResp
             },
             headers={"Retry-After": str(retry_after)},
         )
+    if isinstance(exc, AuthenticationError):
+        return JSONResponse(status_code=401, content={"detail": str(exc), "type": exc.__class__.__name__})
+    if isinstance(exc, AuthDisabledError):
+        return JSONResponse(status_code=403, content={"detail": str(exc), "type": exc.__class__.__name__})
     if isinstance(exc, (LLMError, ToolError)):
         logger.warning("external_dependency_failure", path=request.url.path, error_type=exc.__class__.__name__)
         return JSONResponse(status_code=503, content={"detail": "An external service is currently unavailable", "type": exc.__class__.__name__})
@@ -84,8 +86,4 @@ async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResp
 
 
 app.include_router(health_router)
-app.include_router(profiles_router, prefix="/api/v1")
-app.include_router(opportunities_router, prefix="/api/v1")
-app.include_router(memory_router, prefix="/api/v1")
-app.include_router(sop_router, prefix="/api/v1")
-app.include_router(workflows_router, prefix="/api/v1")
+app.include_router(api_router)

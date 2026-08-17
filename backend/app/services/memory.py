@@ -34,7 +34,16 @@ class MemoryService:
         )
 
     async def record_workflow_context(self, session: AsyncSession, profile_id: UUID | None, *, user_request: str, workflow_id: str, profile: dict | None = None) -> dict | None:
-        """Persist one useful, bounded preference record per workflow profile."""
+        """Persist workflow context in two forms:
+
+        - An always-upserted "current_preferences" row for fast profile-level
+          context loading (unchanged from before).
+        - One new, never-overwritten "workflow_history" row per run, scoped
+          by workflow_id. This is what makes long-term memory an actual
+          accumulating history (past searches) rather than a single row that
+          gets replaced every time -- load_context's vector search then has
+          real history to search over.
+        """
         if profile_id is None:
             return None
         content = {"last_request": user_request, "profile_signals": profile or {}, "workflow_id": workflow_id}
@@ -44,6 +53,16 @@ class MemoryService:
         except LLMError:
             # Persistence remains useful if embeddings are temporarily unavailable.
             pass
-        memory = Memory(profile_id=profile_id, memory_type="workflow_preferences", scope="current_preferences", content=content, source="workflow", embedding=embedding)
-        saved = await self._repository.upsert(session, memory)
+
+        current = Memory(
+            profile_id=profile_id, memory_type="workflow_preferences", scope="current_preferences",
+            content=content, source="workflow", embedding=embedding,
+        )
+        await self._repository.upsert(session, current)
+
+        history_entry = Memory(
+            profile_id=profile_id, memory_type="workflow_history", scope=workflow_id,
+            content=content, source="workflow", embedding=embedding,
+        )
+        saved = await self._repository.create(session, history_entry)
         return {"id": str(saved.id), "memory_type": saved.memory_type, "scope": saved.scope}

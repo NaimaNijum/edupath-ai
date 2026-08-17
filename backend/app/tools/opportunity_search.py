@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.search import extract_keywords
 from app.repositories.opportunity import OpportunityRepository
 from app.schemas.tool import ToolSearchResponse, ToolSearchResult, ToolSource
 
@@ -14,12 +15,28 @@ class OpportunitySearchTool:
 
     async def search(self, session: AsyncSession, query: str, limit: int = 5) -> ToolSearchResponse:
         opportunities = await self._repository.list(session)
+        keywords = extract_keywords(query)
         filtered = [
             opportunity
             for opportunity in opportunities
-            if query.lower() in " ".join(
-                filter(None, [opportunity.title, opportunity.provider or "", opportunity.university or "", opportunity.field or ""])
-            ).lower()
+            if keywords
+            and any(
+                keyword
+                in " ".join(
+                    filter(
+                        None,
+                        [
+                            opportunity.title,
+                            opportunity.provider or "",
+                            opportunity.university or "",
+                            opportunity.field or "",
+                            opportunity.funding_type or "",
+                            opportunity.degree_level or "",
+                        ],
+                    )
+                ).lower()
+                for keyword in keywords
+            )
         ]
         results = [
             ToolSearchResult(
@@ -36,6 +53,8 @@ class OpportunitySearchTool:
                     "degree_level": opportunity.degree_level,
                     "country": opportunity.country,
                     "funding_type": opportunity.funding_type,
+                    "field": opportunity.field,
+                    "deadline": opportunity.deadline.isoformat() if opportunity.deadline else None,
                 },
             )
             for opportunity in filtered[:limit]

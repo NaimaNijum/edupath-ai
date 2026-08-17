@@ -4,8 +4,9 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
-from app.agents.context import ensure_llm_budget, grounded_context
+from app.agents.context import candidates_from_tool_results, ensure_llm_budget, grounded_context
 from app.core.config import settings
+from app.core.exceptions import LLMError, LLMQuotaError
 from app.llm.gemini import get_gemini_provider
 from app.llm.usage import serialize_usage
 from app.schemas.agent import AgentMessage, AgentResult
@@ -29,6 +30,8 @@ def build_professor_agent(provider=None):
         started_at = datetime.now(UTC)
         call_number, call_context = ensure_llm_budget(state, agent_name="professor_agent", purpose="professor_matching")
 
+        candidates = candidates_from_tool_results(state, {"professor_search"}, created_by="professor_agent")
+
         prompt = f"""
 You are EduPath AI's Professor/Supervisor Search Agent.
 
@@ -41,15 +44,37 @@ Profile context:
 {profile}
 {grounded_context(state, {"professor_search", "university_search", "web_search"})}
 
+{len(candidates)} candidate professors were found via database/search tools (already extracted
+separately -- do not restate them as structured data). Never invent a professor's name, email,
+or profile URL that isn't backed by a tool result. If zero candidates were found, say so plainly.
+
 Return JSON with summary, key_findings, recommended_next_agent, supervisor_message, next_agent_message, confidence.
 """
 
-        structured, raw_result = provider.generate_structured(
-            prompt,
-            response_model=ProfessorAgentOutput,
-            model=settings.gemini_model,
-            context=call_context,
-        )
+        try:
+            structured, raw_result = provider.generate_structured(
+                prompt,
+                response_model=ProfessorAgentOutput,
+                model=settings.gemini_model,
+                context=call_context,
+            )
+        except LLMQuotaError:
+            raise
+        except LLMError as exc:
+            error_message = f"Professor agent failed during LLM call: {exc}"
+            return {
+                "errors": [error_message],
+                "llm_call_count": call_number,
+                "candidate_opportunities": candidates,
+                "agent_messages": [
+                    AgentMessage(
+                        sender="professor_agent",
+                        receiver="supervisor",
+                        message_type="error",
+                        content=f"Failed to generate professor analysis. Reason: {exc}",
+                    )
+                ],
+            }
         completed_at = datetime.now(UTC)
 
         result = AgentResult(
@@ -69,6 +94,7 @@ Return JSON with summary, key_findings, recommended_next_agent, supervisor_messa
 
         return {
             "professor_research": structured.model_dump(),
+            "candidate_opportunities": candidates,
             "agent_results": [result],
             "llm_call_count": call_number,
             "agent_messages": [

@@ -4,52 +4,80 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
-from app.agents.context import ensure_llm_budget, grounded_context
+from app.agents.context import ensure_llm_budget, grounded_context, summarize_candidates
 from app.core.config import settings
+from app.core.exceptions import LLMError, LLMQuotaError
 from app.llm.gemini import get_gemini_provider
 from app.llm.usage import serialize_usage
 from app.schemas.agent import AgentMessage, AgentResult
+from app.schemas.opportunity_candidate import VerificationVerdict
 
 
 class VerificationAgentOutput(BaseModel):
     summary: str
     key_findings: list[str] = Field(default_factory=list)
-    recommended_next_agent: str = "__end__"
+    recommended_next_agent: str = "ranking_agent"
     supervisor_message: str
     next_agent_message: str | None = None
     confidence: float = 0.85
+    evaluations: list[VerificationVerdict] = Field(default_factory=list)
 
 
 def build_verification_agent(provider=None):
     provider = provider or get_gemini_provider()
 
     def verification_agent(state: dict) -> dict:
-        user_request = state.get("user_request") or state.get("user_input", "")
-        results = state.get("agent_results", [])
+        candidates = state.get("candidate_opportunities", [])
         started_at = datetime.now(UTC)
         call_number, call_context = ensure_llm_budget(state, agent_name="verification_agent", purpose="cross_agent_verification")
 
         prompt = f"""
 You are EduPath AI's Verification Agent.
 
-Verify the coherence of the cross-agent reasoning and summarize any gaps.
+For EACH candidate opportunity below, judge whether its key facts (official_url, university,
+deadline) look verified, unverified, or possibly stale, based ONLY on the evidence already
+attached to it and the tool results below. You cannot browse the web yourself -- you are
+auditing what other agents already found, not re-discovering it.
 
-Student request:
-{user_request}
+- "verified": the candidate has a concrete official_url and consistent supporting evidence.
+- "unverified": no official_url or no supporting evidence was attached.
+- "stale_suspected": evidence exists but looks outdated or internally inconsistent.
 
-Agent results:
-{results}
+Never mark something "verified" just because it sounds plausible -- only when real evidence is
+present. List which fields you actually checked in checked_fields.
+
+Candidate opportunities to audit (opportunity_id must match exactly):
+{summarize_candidates(candidates)}
 {grounded_context(state, {"opportunity_search", "professor_search", "university_search", "web_search"})}
 
-Return JSON with summary, key_findings, recommended_next_agent, supervisor_message, next_agent_message, confidence.
+If the candidate list above is empty, return an empty evaluations list.
+
+Return JSON with summary, key_findings, recommended_next_agent, supervisor_message, next_agent_message, confidence, evaluations.
 """
 
-        structured, raw_result = provider.generate_structured(
-            prompt,
-            response_model=VerificationAgentOutput,
-            model=settings.gemini_model,
-            context=call_context,
-        )
+        try:
+            structured, raw_result = provider.generate_structured(
+                prompt,
+                response_model=VerificationAgentOutput,
+                model=settings.gemini_model,
+                context=call_context,
+            )
+        except LLMQuotaError:
+            raise
+        except LLMError as exc:
+            error_message = f"Verification agent failed during LLM call: {exc}"
+            return {
+                "errors": [error_message],
+                "llm_call_count": call_number,
+                "agent_messages": [
+                    AgentMessage(
+                        sender="verification_agent",
+                        receiver="supervisor",
+                        message_type="error",
+                        content=f"Failed to generate verification report. Reason: {exc}",
+                    )
+                ],
+            }
         completed_at = datetime.now(UTC)
 
         result = AgentResult(
@@ -68,7 +96,8 @@ Return JSON with summary, key_findings, recommended_next_agent, supervisor_messa
         )
 
         return {
-            "verification_report": structured.model_dump(),
+            "verification_report": structured.model_dump(exclude={"evaluations"}),
+            "verification_verdicts": structured.evaluations,
             "agent_results": [result],
             "llm_call_count": call_number,
             "agent_messages": [

@@ -1,0 +1,40 @@
+# EduPath AI -- design system theme.
+# Primary = electric indigo, sidebar = deep navy, surface = near-white.
+# See streamlit_app/styles/main.css for the CSS layer built on top of this.
+
+[theme]
+base = "light"
+primaryColor = "#4F46E5"
+backgroundColor = "#F6F7FB"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#0F172A"
+linkColor = "#4F46E5"
+borderColor = "#E5E7EB"
+showWidgetBorder = true
+showSidebarBorder = false
+baseRadius = "12px"
+buttonRadius = "10px"
+font = "'Inter':https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+baseFontSize = 15
+headingFontWeights = [700, 700, 600, 600, 600, 600]
+
+grayColor = "#6B7280"
+blueColor = "#4F46E5"
+violetColor = "#7C3AED"
+greenColor = "#16A34A"
+orangeColor = "#F59E0B"
+redColor = "#DC2626"
+yellowColor = "#EAB308"
+
+[theme.sidebar]
+backgroundColor = "#0B1220"
+secondaryBackgroundColor = "#131C31"
+textColor = "#E2E8F0"
+primaryColor = "#818CF8"
+borderColor = "#1E293B"
+
+[client]
+toolbarMode = "minimal"
+
+[server]
+headless = true

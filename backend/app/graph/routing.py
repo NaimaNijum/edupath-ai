@@ -9,13 +9,34 @@ ALL_AGENTS: Final[set[str]] = {
     "university_agent",
     "scholarship_agent",
     "eligibility_agent",
-    "sop_agent",
+    "research_match_agent",
     "verification_agent",
+    "ranking_agent",
+    "sop_agent",
 }
 
 
 def route_from_supervisor(state: dict) -> str:
     return state.get("next_agent", "__end__")
+
+
+def ensure_approval_gate(plan: list[str]) -> list[str]:
+    """Deterministically insert the approval_gate node immediately before
+    sop_agent, whenever sop_agent is present in the plan.
+
+    This is intentionally NOT left to the LLM's own planning (approval_gate
+    is not a member of ALL_AGENTS, so Gemini can never select or misplace
+    it) -- the human-approval pause before SOP generation must be a
+    structural guarantee, not a prompt-following outcome. Must be called
+    exactly once, when a plan is first established, since plan_index
+    indexes into whatever list is ultimately stored in state.
+    """
+    if "sop_agent" not in plan:
+        return plan
+    plan = [agent for agent in plan if agent != "approval_gate"]
+    index = plan.index("sop_agent")
+    plan.insert(index, "approval_gate")
+    return plan
 
 
 def build_execution_plan(user_request: str) -> list[str]:
@@ -116,6 +137,11 @@ def build_execution_plan(user_request: str) -> list[str]:
     if phd_or_research_request and "eligibility_agent" not in plan:
         plan.append("eligibility_agent")
 
+    # Research alignment scoring should run whenever we have candidates
+    # worth scoring (i.e. whenever eligibility review is also happening).
+    if "eligibility_agent" in plan and "research_match_agent" not in plan:
+        plan.append("research_match_agent")
+
     # SOP generation
     if any(
         keyword in request
@@ -130,9 +156,17 @@ def build_execution_plan(user_request: str) -> list[str]:
     if phd_or_research_request and "sop_agent" not in plan:
         plan.append("sop_agent")
 
-    # Verification should happen after research-oriented agents.
+    # Verification and ranking happen after research-oriented agents, and
+    # before the plan reaches sop_agent (moved to the end below).
     if len(plan) > 1:
         plan.append("verification_agent")
+        plan.append("ranking_agent")
+
+    # sop_agent should always be the last step when present, since it's
+    # meant to draft guidance using the final ranked/verified candidates.
+    if "sop_agent" in plan:
+        plan.remove("sop_agent")
+        plan.append("sop_agent")
 
     # Remove duplicates while preserving execution order.
     plan = list(dict.fromkeys(plan))
