@@ -52,29 +52,93 @@ def main() -> None:
     nav = st.navigation(
         {
             "Home": [
-                st.Page("pages/dashboard.py", title="Dashboard", icon=":material/dashboard:", default=True, url_path="dashboard"),
+                st.Page(
+                    "pages/dashboard.py",
+                    title="Dashboard",
+                    icon=":material/dashboard:",
+                    default=True,
+                    url_path="dashboard",
+                ),
             ],
-            "Counseling": [
-                st.Page("pages/counseling.py", title="New Session", icon=":material/add_circle:", url_path="counseling"),
-                st.Page("pages/discover.py", title="History & Analysis", icon=":material/history:", url_path="history"),
+            "Counseling & Search": [
+                st.Page(
+                    "pages/counseling.py",
+                    title="New Counseling Session",
+                    icon=":material/add_circle:",
+                    url_path="counseling",
+                ),
+                st.Page(
+                    "pages/discover.py",
+                    title="Discover Opportunities",
+                    icon=":material/school:",
+                    url_path="discover",
+                ),
+                st.Page(
+                    "pages/saved.py",
+                    title="Saved Opportunities",
+                    icon=":material/bookmark:",
+                    url_path="saved",
+                ),
             ],
-            "Explore": [
-                st.Page("pages/discover.py", title="Universities & Programs", icon=":material/school:", url_path="universities"),
-                st.Page("pages/saved.py", title="Saved Matches", icon=":material/bookmark:", url_path="saved"),
+            "Application Suite": [
+                st.Page(
+                    "pages/sop.py",
+                    title="Document Workspace",
+                    icon=":material/edit_note:",
+                    url_path="documents",
+                ),
+                st.Page(
+                    "pages/tracker.py",
+                    title="Application Tracker",
+                    icon=":material/checklist:",
+                    url_path="tracker",
+                ),
+                st.Page(
+                    "pages/profile.py",
+                    title="Student Profile",
+                    icon=":material/person:",
+                    url_path="profile",
+                ),
             ],
-            "Application": [
-                st.Page("pages/sop.py", title="Document Workspace", icon=":material/edit_note:", url_path="documents"),
-                st.Page("pages/tracker.py", title="Application Tracker", icon=":material/checklist:", url_path="tracker"),
-                st.Page("pages/profile.py", title="Student Profile", icon=":material/person:", url_path="profile"),
+            "AI Workforce": [
+                st.Page(
+                    "pages/agent_trace.py",
+                    title="Live Agent Trace",
+                    icon=":material/timeline:",
+                    url_path="agent-trace",
+                ),
+                st.Page(
+                    "pages/execution_graph.py",
+                    title="Execution Graph",
+                    icon=":material/hub:",
+                    url_path="execution-graph",
+                ),
+                st.Page(
+                    "pages/memory.py",
+                    title="AI Memory",
+                    icon=":material/psychology:",
+                    url_path="memory",
+                ),
+                st.Page(
+                    "pages/usage.py",
+                    title="Usage & Tokens",
+                    icon=":material/bar_chart:",
+                    url_path="usage",
+                ),
             ],
-            "Workforce": [
-                st.Page("pages/agent_trace.py", title="Live Agent Trace", icon=":material/timeline:", url_path="agent-trace"),
-                st.Page("pages/execution_graph.py", title="Execution Graph", icon=":material/hub:", url_path="execution-graph"),
-                st.Page("pages/memory.py", title="AI Memory", icon=":material/psychology:", url_path="memory"),
-                st.Page("pages/usage.py", title="Usage & Tokens", icon=":material/bar_chart:", url_path="usage"),
-            ],
-            "": [
-                st.Page("pages/settings.py", title="Settings", icon=":material/settings:", url_path="settings"),
+            "Account & System": [
+                st.Page(
+                    "pages/settings.py",
+                    title="Settings & System",
+                    icon=":material/settings:",
+                    url_path="settings",
+                ),
+                st.Page(
+                    "pages/landing.py",
+                    title="Marketing Landing",
+                    icon=":material/home_work:",
+                    url_path="landing",
+                ),
             ],
         }
     )
