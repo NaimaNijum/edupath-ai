@@ -15,17 +15,12 @@ Features:
 """
 from __future__ import annotations
 
-import textwrap
 import streamlit as st
-
-
-def _html(content: str) -> None:
-    """Render HTML safely without markdown 4-space code block formatting."""
-    st.markdown(textwrap.dedent(content).strip(), unsafe_allow_html=True)
+from components.common import render_html
 
 
 def _hide_streamlit_chrome() -> None:
-    _html(
+    render_html(
         """
         <style>
         [data-testid="stSidebar"] { display: none !important; }
@@ -43,7 +38,7 @@ def _hide_streamlit_chrome() -> None:
 
 
 def render_navigation() -> None:
-    _html(
+    render_html(
         """
         <nav class="ep-landing-nav">
           <div class="ep-landing-nav-inner">
@@ -68,7 +63,7 @@ def render_navigation() -> None:
 
 
 def render_hero() -> None:
-    _html(
+    render_html(
         """
         <section class="ep-hero-section">
           <div class="ep-hero-inner">
@@ -99,7 +94,6 @@ def render_hero() -> None:
             </div>
 
             <div class="ep-hero-visual">
-              <!-- AI Multi-Agent Network Vector Graphic & Live Card -->
               <div style="position: relative;">
                 <!-- Decorative SVG Background Aura -->
                 <svg style="position: absolute; top: -30px; left: -30px; width: 420px; height: 420px; z-index: 0; pointer-events: none; opacity: 0.6;" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -187,7 +181,7 @@ def render_hero() -> None:
 
 
 def render_problem_section() -> None:
-    _html(
+    render_html(
         """
         <section class="ep-landing-section ep-section-alt" id="problem">
           <div class="ep-landing-section-center">
@@ -200,7 +194,6 @@ def render_problem_section() -> None:
             </p>
           </div>
 
-          <!-- Problem Grid with Icons & SVG Accents -->
           <div class="ep-problem-grid">
             <div class="ep-problem-card">
               <div class="ep-problem-icon">📚</div>
@@ -246,7 +239,7 @@ def render_problem_section() -> None:
 
 
 def render_how_it_works() -> None:
-    _html(
+    render_html(
         """
         <section class="ep-landing-section" id="how-it-works">
           <div class="ep-landing-section-center">
@@ -292,7 +285,7 @@ def render_how_it_works() -> None:
 
 
 def render_agents_section() -> None:
-    _html(
+    render_html(
         """
         <section class="ep-landing-section ep-section-alt" id="agents">
           <div class="ep-landing-section-center">
@@ -364,7 +357,7 @@ def render_agents_section() -> None:
 
 
 def render_personalization_section() -> None:
-    _html(
+    render_html(
         """
         <section class="ep-landing-section" id="personalization">
           <div class="ep-landing-section-center">
@@ -422,7 +415,7 @@ def render_personalization_section() -> None:
 
 
 def render_features_section() -> None:
-    _html(
+    render_html(
         """
         <section class="ep-landing-section ep-section-alt" id="features">
           <div class="ep-landing-section-center">
@@ -471,7 +464,7 @@ def render_features_section() -> None:
 
 
 def render_trust_section() -> None:
-    _html(
+    render_html(
         """
         <section class="ep-landing-section" id="trust">
           <div class="ep-landing-section-center">
@@ -517,7 +510,7 @@ def render_trust_section() -> None:
 
 
 def render_cta_section() -> None:
-    _html(
+    render_html(
         """
         <section class="ep-cta-section">
           <div class="ep-cta-inner">
@@ -532,7 +525,7 @@ def render_cta_section() -> None:
 
 
 def render_footer() -> None:
-    _html(
+    render_html(
         """
         <footer class="ep-landing-footer">
           <div class="ep-footer-inner">

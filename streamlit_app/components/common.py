@@ -7,6 +7,15 @@ from components.empty_state import render_error_card
 from utils.config import BACKEND_URL
 
 
+def render_html(content: str) -> None:
+    """Render HTML safely without markdown 4-space code block formatting."""
+    if hasattr(st, "html"):
+        st.html(content)
+    else:
+        cleaned = "\n".join(line.strip() for line in content.splitlines() if line.strip())
+        st.markdown(cleaned, unsafe_allow_html=True)
+
+
 def render_backend_error(error: BackendError, *, key: str = "generic") -> bool:
     """Render a user-friendly error card for a BackendError. Never shows raw
     tracebacks or provider payloads. Returns True if the user clicked Retry."""
@@ -26,9 +35,9 @@ def render_backend_error(error: BackendError, *, key: str = "generic") -> bool:
 
 
 def section_header(title: str, subtitle: str | None = None) -> None:
-    st.markdown(f'<div class="ep-section-title">{title}</div>', unsafe_allow_html=True)
+    render_html(f'<div class="ep-section-title">{title}</div>')
     if subtitle:
-        st.markdown(f'<div class="ep-section-subtitle">{subtitle}</div>', unsafe_allow_html=True)
+        render_html(f'<div class="ep-section-subtitle">{subtitle}</div>')
 
 
 def confidence_label(confidence: float | None) -> str | None:

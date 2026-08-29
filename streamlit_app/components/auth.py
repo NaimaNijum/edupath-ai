@@ -1,16 +1,10 @@
 from __future__ import annotations
 
-import textwrap
 import streamlit as st
 
 from api.client import BackendError, dev_login, get_auth_config, get_current_user, get_my_profile, logout
-from components.common import render_backend_error
+from components.common import render_backend_error, render_html
 from utils.config import BACKEND_URL
-
-
-def _html(content: str) -> None:
-    """Render HTML safely without markdown 4-space code block formatting."""
-    st.markdown(textwrap.dedent(content).strip(), unsafe_allow_html=True)
 
 
 def _clear_session_auth() -> None:
@@ -90,7 +84,7 @@ def require_auth() -> None:
 
 def render_login_gate() -> None:
     """Full-page, modern split sign-in UI."""
-    _html(
+    render_html(
         """
         <style>
             [data-testid="stSidebar"] { display: none !important; }
@@ -120,7 +114,7 @@ def render_login_gate() -> None:
     left_col, right_col = st.columns([1.1, 0.9], gap="large")
 
     with left_col:
-        _html(
+        render_html(
             """
             <div class="ep-auth-branding-panel">
                 <div class="ep-brand" style="margin-bottom: 1.25rem;">
@@ -144,16 +138,16 @@ def render_login_gate() -> None:
                   <line x1="60" y1="40" x2="320" y2="40" stroke="#CBD5E1" stroke-width="2" stroke-dasharray="4 4"/>
                   <!-- Node 1 -->
                   <circle cx="60" cy="40" r="18" fill="#EEF2FF" stroke="#4F46E5" stroke-width="2"/>
-                  <text x="60" y="44" font-size="12" text-anchor="middle" fill="#4F46E5" font-weight="bold">Profile</text>
+                  <text x="60" y="44" font-size="11" text-anchor="middle" fill="#4F46E5" font-weight="bold">Profile</text>
                   <!-- Node 2 -->
                   <circle cx="150" cy="40" r="18" fill="#EEF2FF" stroke="#4F46E5" stroke-width="2"/>
-                  <text x="150" y="44" font-size="12" text-anchor="middle" fill="#4F46E5" font-weight="bold">Match</text>
+                  <text x="150" y="44" font-size="11" text-anchor="middle" fill="#4F46E5" font-weight="bold">Match</text>
                   <!-- Node 3 -->
                   <circle cx="240" cy="40" r="18" fill="#F5F3FF" stroke="#7C3AED" stroke-width="2"/>
-                  <text x="240" y="44" font-size="12" text-anchor="middle" fill="#7C3AED" font-weight="bold">Funding</text>
+                  <text x="240" y="44" font-size="11" text-anchor="middle" fill="#7C3AED" font-weight="bold">Funding</text>
                   <!-- Node 4 -->
                   <circle cx="320" cy="40" r="18" fill="#ECFDF5" stroke="#16A34A" stroke-width="2"/>
-                  <text x="320" y="44" font-size="12" text-anchor="middle" fill="#16A34A" font-weight="bold">SOP</text>
+                  <text x="320" y="44" font-size="11" text-anchor="middle" fill="#16A34A" font-weight="bold">SOP</text>
                 </svg>
 
                 <div class="ep-auth-feature-list">
@@ -185,7 +179,7 @@ def render_login_gate() -> None:
 
     with right_col:
         with st.container(key="login-auth-card", border=False):
-            _html(
+            render_html(
                 """
                 <div style="margin-bottom: 1.25rem;">
                     <div style="font-size: 1.4rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Sign In</div>
@@ -209,7 +203,7 @@ def render_login_gate() -> None:
                         use_container_width=True,
                         icon=":material/login:",
                     )
-                    _html(
+                    render_html(
                         """
                         <div class="ep-auth-divider-isolated">
                             <span>or continue with email</span>
@@ -220,7 +214,7 @@ def render_login_gate() -> None:
                 else:
                     _render_dev_login_form()
 
-            _html(
+            render_html(
                 """
                 <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #F1F5F9; text-align: center;">
                     <span style="font-size: 0.75rem; color: #94A3B8;">
@@ -238,7 +232,7 @@ def _render_dev_login_form(*, show_backend_warning: bool = False) -> None:
             icon=":material/warning:",
         )
 
-    _html(
+    render_html(
         """
         <div style="background: #EEF2FF; border: 1px solid #C7D2FE; border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1.1rem;">
             <div style="font-size: 0.82rem; color: #3730A3; font-weight: 600; margin-bottom: 0.15rem;">
