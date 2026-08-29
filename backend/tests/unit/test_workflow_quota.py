@@ -4,29 +4,11 @@ from __future__ import annotations
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from google.genai import errors as genai_errors
 
 from app.core.exceptions import LLMQuotaError
 from app.main import app
 from app.schemas.workflow import WorkflowCreateRequest
 from app.services.workflow import WorkflowService
-
-
-def _make_quota_error(retry_seconds: int = 27) -> genai_errors.APIError:
-    response = httpx.Response(
-        429,
-        json={
-            "error": {
-                "code": 429,
-                "status": "RESOURCE_EXHAUSTED",
-                "message": "Quota exceeded",
-                "details": [
-                    {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": f"{retry_seconds}s"}
-                ],
-            }
-        },
-    )
-    return genai_errors.APIError(429, response.json(), response)
 
 
 class _RecordingRepository:
@@ -52,9 +34,9 @@ class _FailingProvider:
     def generate_structured(self, prompt, *, response_model, model=None, temperature=None, system_instruction=None, context=None):
         self.calls += 1
         raise LLMQuotaError(
-            "Gemini quota exhausted for model gemini-3.6-flash: Quota exceeded",
-            provider="gemini",
-            model="gemini-3.6-flash",
+            "OpenRouter rate limit exhausted for model openrouter/free: Quota exceeded",
+            provider="openrouter",
+            model="openrouter/free",
             status_code=429,
             retry_after=27,
             quota_message="Quota exceeded",
@@ -79,9 +61,9 @@ async def test_workflow_propagates_quota_error() -> None:
     class _QuotingGraph:
         def invoke(self, state, config=None):
             raise LLMQuotaError(
-                "Gemini quota exhausted for model gemini-3.6-flash: Quota exceeded",
-                provider="gemini",
-                model="gemini-3.6-flash",
+                "OpenRouter rate limit exhausted for model openrouter/free: Quota exceeded",
+                provider="openrouter",
+                model="openrouter/free",
                 status_code=429,
                 retry_after=27,
                 quota_message="Quota exceeded",
@@ -98,10 +80,10 @@ async def test_workflow_propagates_quota_error() -> None:
         await service.execute(None, WorkflowCreateRequest(user_request="I want a funded PhD in AI in USA."))
 
     err = exc_info.value
-    assert err.provider == "gemini"
+    assert err.provider == "openrouter"
     assert err.retry_after == 27
     assert repository.failed_error is not None
-    assert "Gemini quota exhausted" in repository.failed_error
+    assert "OpenRouter rate limit exhausted" in repository.failed_error
 
 
 def test_fastapi_returns_429_for_quota_error(monkeypatch) -> None:
@@ -115,9 +97,9 @@ def test_fastapi_returns_429_for_quota_error(monkeypatch) -> None:
         async def execute(self, session, request: WorkflowCreateRequest):
             self.calls.append(request)
             raise LLMQuotaError(
-                "Gemini quota exhausted for model gemini-3.6-flash: Quota exceeded",
-                provider="gemini",
-                model="gemini-3.6-flash",
+                "OpenRouter rate limit exhausted for model openrouter/free: Quota exceeded",
+                provider="openrouter",
+                model="openrouter/free",
                 status_code=429,
                 retry_after=27,
                 quota_message="Quota exceeded",
@@ -138,8 +120,8 @@ def test_fastapi_returns_429_for_quota_error(monkeypatch) -> None:
     assert response.status_code == 429
     body = response.json()
     assert body["type"] == "LLMQuotaError"
-    assert body["provider"] == "gemini"
-    assert body["model"] == "gemini-3.6-flash"
+    assert body["provider"] == "openrouter"
+    assert body["model"] == "openrouter/free"
     assert body["retry_after"] == 27
     assert "Retry-After" in response.headers
     assert response.headers["Retry-After"] == "27"
@@ -153,9 +135,9 @@ def test_supervisor_propagates_quota_error() -> None:
     class _QuotaProvider:
         def generate_structured(self, prompt, *, response_model, model=None, temperature=None, system_instruction=None, context=None):
             raise LLMQuotaError(
-                "Gemini quota exhausted for model gemini-3.6-flash: Quota exceeded",
-                provider="gemini",
-                model="gemini-3.6-flash",
+                "OpenRouter rate limit exhausted for model openrouter/free: Quota exceeded",
+                provider="openrouter",
+                model="openrouter/free",
                 status_code=429,
                 retry_after=27,
                 quota_message="Quota exceeded",
@@ -185,9 +167,9 @@ def test_profile_agent_propagates_quota_error() -> None:
     class _QuotaProvider:
         def generate_structured(self, prompt, *, response_model, model=None, temperature=None, system_instruction=None, context=None):
             raise LLMQuotaError(
-                "Gemini quota exhausted for model gemini-3.6-flash: Quota exceeded",
-                provider="gemini",
-                model="gemini-3.6-flash",
+                "OpenRouter rate limit exhausted for model openrouter/free: Quota exceeded",
+                provider="openrouter",
+                model="openrouter/free",
                 status_code=429,
                 retry_after=27,
                 quota_message="Quota exceeded",

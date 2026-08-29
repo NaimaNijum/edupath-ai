@@ -10,7 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import EduPathError, WorkflowError
 from app.graph.workflow import build_graph
+from app.repositories.profile import ProfileRepository
 from app.repositories.workflow import WorkflowRepository
+from app.schemas.profile import StudentProfileRead
 from app.schemas.workflow import (
     AgentExecutionRead,
     AgentMessageRead,
@@ -33,6 +35,7 @@ class WorkflowService:
         self,
         provider=None,
         repository: WorkflowRepository | None = None,
+        profile_repository: ProfileRepository | None = None,
         graph=None,
         memory_service: MemoryService | None = None,
         tooling_service: ToolingService | None = None,
@@ -40,6 +43,7 @@ class WorkflowService:
     ) -> None:
         self._graph = graph or build_graph(provider=provider)
         self._repository = repository or WorkflowRepository()
+        self._profile_repository = profile_repository or ProfileRepository()
         self._memory_service = memory_service or MemoryService()
         self._tooling_service = tooling_service or ToolingService()
         self._catalog_sync_service = catalog_sync_service or CatalogSyncService()
@@ -64,12 +68,22 @@ class WorkflowService:
 
         tool_results = await self._tooling_service.build_context(session, request.user_request)
 
+        profile_data: dict = {}
+        if profile_id is not None and session is not None:
+            try:
+                profile_record = await self._profile_repository.get(session, profile_id)
+                if profile_record is not None:
+                    profile_data = StudentProfileRead.model_validate(profile_record).model_dump(mode="json")
+            except Exception:
+                profile_data = {}
+
         state = {
             "workflow_id": str(workflow.id),
             "workflow_type": request.workflow_type,
             "user_request": request.user_request,
             "user_input": request.user_request,
             "student_profile_id": request.student_profile_id,
+            "profile": profile_data,
             "workflow_status": "running",
             "approval_status": "not_required",
             "execution_plan": [],

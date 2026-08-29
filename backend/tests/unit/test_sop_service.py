@@ -98,7 +98,7 @@ async def test_revise_increments_draft_version_and_uses_prior_content_in_prompt(
     assert revised.draft_version == 2
     assert revised.content == "Draft two, revised."
     # The revision prompt must include the PRIOR draft's content, not just the feedback --
-    # otherwise Gemini has nothing to actually revise from.
+    # otherwise the LLM has nothing to actually revise from.
     assert "Draft one." in provider.prompts[1]
     assert "Make it more concise." in provider.prompts[1]
 

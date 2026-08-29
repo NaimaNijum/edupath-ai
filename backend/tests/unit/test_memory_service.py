@@ -18,8 +18,8 @@ class _NoEmbeddingProvider:
 
 
 @pytest.fixture(autouse=True)
-def _no_real_gemini_calls(monkeypatch):
-    monkeypatch.setattr(memory_module, "get_gemini_provider", lambda: _NoEmbeddingProvider())
+def _no_real_provider_calls(monkeypatch):
+    monkeypatch.setattr(memory_module, "get_openrouter_provider", lambda: _NoEmbeddingProvider())
 
 
 class FakeMemoryRepository:

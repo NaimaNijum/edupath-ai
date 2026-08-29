@@ -277,3 +277,27 @@ def test_profile_agent_unit():
     agent_message = result_state["agent_messages"][0]
     assert agent_message.sender == "profile_agent"
     assert agent_message.receiver == "supervisor"
+
+
+def test_undergraduate_workflow_plan_excludes_professor_agent():
+    plan = build_execution_plan("I want admission in Computer Science bachelor program in USA with scholarships", profile={"target_degree": "Bachelor"})
+    assert "professor_agent" not in plan
+    assert "university_agent" in plan
+    assert "scholarship_agent" in plan
+    assert "ranking_agent" in plan
+
+
+def test_phd_workflow_plan_includes_professor_and_research_match():
+    plan = build_execution_plan("I want a funded PhD in AI and need to find an advisor", profile={"target_degree": "PhD"})
+    assert "professor_agent" in plan
+    assert "university_agent" in plan
+    assert "research_match_agent" in plan
+    assert "ranking_agent" in plan
+    assert "sop_agent" in plan
+
+
+def test_masters_workflow_plan_includes_research_match():
+    plan = build_execution_plan("I want an MS in Data Science with funding", profile={"target_degree": "Masters"})
+    assert "university_agent" in plan
+    assert "scholarship_agent" in plan
+    assert "research_match_agent" in plan

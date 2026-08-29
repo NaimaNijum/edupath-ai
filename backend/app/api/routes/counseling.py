@@ -71,11 +71,15 @@ async def get_counseling_trace(
     workflow = await service.get_workflow(session, session_id)
     if workflow is None:
         raise HTTPException(status_code=404, detail="Counseling session not found")
+    messages = await service.list_messages(session, session_id)
+    events = await service.list_logs(session, session_id)
+    agents = await service.list_agents(session, session_id)
     return {
         "workflow_id": str(session_id),
         "status": workflow.status,
-        "messages": [],
-        "events": [],
+        "messages": [m.model_dump(mode="json") for m in messages],
+        "events": events,
+        "agents": [a.model_dump(mode="json") for a in agents],
     }
 
 
@@ -88,6 +92,10 @@ async def get_counseling_graph(
     workflow = await service.get_workflow(session, session_id)
     if workflow is None:
         raise HTTPException(status_code=404, detail="Counseling session not found")
+    agents = await service.list_agents(session, session_id)
+    completed_agent_names = [a.agent_name for a in agents]
+    result = await service.get_workflow_result(session, session_id) or {}
+    execution_plan = result.get("execution_plan") or []
     return {
         "workflow_id": str(session_id),
         "graph": [
@@ -95,10 +103,15 @@ async def get_counseling_graph(
             "profile_agent",
             "university_agent",
             "scholarship_agent",
-            "research_match_agent",
             "professor_agent",
-            "recommendation_agent",
-            "document_agent",
+            "eligibility_agent",
+            "research_match_agent",
+            "verification_agent",
+            "ranking_agent",
+            "approval_gate",
+            "sop_agent",
         ],
+        "execution_plan": execution_plan,
+        "completed_agents": completed_agent_names,
         "status": workflow.status,
     }

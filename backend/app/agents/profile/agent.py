@@ -89,8 +89,15 @@ Return JSON with:
             estimated_cost_usd=raw_result.usage.estimated_cost_usd,
         )
 
+        existing_profile = dict(state.get("profile") or {})
+        updated_profile = {
+            **existing_profile,
+            **structured.model_dump(),
+        }
+
         return {
-            "profile": structured.model_dump(),
+            "profile": updated_profile,
+            "profile_analysis": structured.model_dump(),
             "agent_results": [result],
             "llm_call_count": call_number,
             "agent_messages": [

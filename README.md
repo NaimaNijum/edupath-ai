@@ -46,8 +46,8 @@ URL) or explicitly marked unverified. Nothing is invented.
 
 ```text
 ┌──────────────────────────────────────┐
-│          🎓 EduPath AI               │
-│  Multi-Agent Study Abroad Counselor │
+│          🎓 EduPath AI               |
+│  Multi-Agent Study Abroad Counselor  │
 └──────────────────┬───────────────────┘
                    │
                    ▼
@@ -58,16 +58,16 @@ URL) or explicitly marked unverified. Nothing is invented.
 │                         │    Streamlit     │                                │
 │                         │   Interactive UI │                                │
 │                         └────────┬─────────┘                                │
-│                                  │ HTTP / SSE                                │
+│                                  │ HTTP / SSE                               │
 └──────────────────────────────────┼──────────────────────────────────────────┘
                                    │
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           FASTAPI BACKEND                                   │
 │                                                                             │
-│  ┌────────────────┐  ┌────────────────┐  ┌──────────────────────────────┐  │
-│  │ Profile API    │  │ Counseling API │  │ HITL / Approval API           │  │
-│  └────────────────┘  └───────┬────────┘  └──────────────────────────────┘  │
+│  ┌────────────────┐  ┌────────────────┐  ┌──────────────────────────────┐   │
+│  │ Profile API    │  │ Counseling API │  │ HITL / Approval API          │   │
+│  └────────────────┘  └───────┬────────┘  └──────────────────────────────┘   │
 │                              │                                              │
 │                              ▼                                              │
 │                    ┌──────────────────────┐                                 │
@@ -80,7 +80,7 @@ URL) or explicitly marked unverified. Nothing is invented.
 │                         LANGGRAPH ORCHESTRATION                             │
 │                                                                             │
 │                    ┌──────────────────────────────┐                         │
-│                    │      SUPERVISOR AGENT       │                         │
+│                    │      SUPERVISOR AGENT        │                         │
 │                    │                              │                         │
 │                    │ • Understand user request    │                         │
 │                    │ • Analyze degree level       │                         │
@@ -92,27 +92,27 @@ URL) or explicitly marked unverified. Nothing is invented.
 │          ┌────────────────────────┼────────────────────────┐                │
 │          │                        │                        │                │
 │          ▼                        ▼                        ▼                │
-│  ┌────────────────┐      ┌────────────────┐      ┌─────────────────┐       │
-│  │ PROFILE        │      │ UNIVERSITY     │      │ SCHOLARSHIP     │       │
-│  │ ANALYST AGENT  │      │ RESEARCH AGENT │      │ AGENT           │       │
-│  │                │      │                │      │                 │       │
-│  │ • CGPA         │      │ • Programs     │      │ • Scholarships  │       │
-│  │ • Skills       │      │ • Universities │      │ • Funding       │       │
-│  │ • Experience   │      │ • Ranking      │      │ • Eligibility   │       │
-│  │ • Strengths    │      │ • Requirements │      │ • Deadlines     │       │
-│  └───────┬────────┘      └───────┬────────┘      └────────┬────────┘       │
-│          │                        │                        │                │
-│          │                        │                        │                │
-│          ▼                        ▼                        ▼                │
-│  ┌────────────────┐      ┌────────────────┐      ┌─────────────────┐       │
-│  │ RESEARCH       │      │ PROFESSOR      │      │ DOCUMENT        │       │
-│  │ DOMAIN AGENT   │      │ MATCHING AGENT │      │ AGENT           │       │
-│  │                │      │                │      │                 │       │
-│  │ • Research fit │      │ • Faculty      │      │ • SOP           │       │
-│  │ • Domain       │      │ • Research     │      │ • LOR           │       │
-│  │ • Skill gaps   │      │ • Similarity   │      │ • Email         │       │
-│  │ • Trends       │      │ • Funding      │      │ • CV Feedback   │       │
-│  └───────┬────────┘      └───────┬────────┘      └────────┬────────┘       │
+│  ┌────────────────┐      ┌────────────────┐      ┌─────────────────┐        │
+│  │ PROFILE        │      │ UNIVERSITY     │      │ SCHOLARSHIP     │        │
+│  │ ANALYST AGENT  │      │ RESEARCH AGENT │      │ AGENT           │        │
+│  │                │      │                │      │                 │        │
+│  │ • CGPA         │      │ • Programs     │      │ • Scholarships  │        │
+│  │ • Skills       │      │ • Universities │      │ • Funding       │        │
+│  │ • Experience   │      │ • Ranking      │      │ • Eligibility   │        │
+│  │ • Strengths    │      │ • Requirements │      │ • Deadlines     │        │
+│  └───────┬────────┘      └───────┬────────┘      └────────┬────────┘        │
+│          │                       │                        │                 │
+│          │                       │                        │                 │
+│          ▼                       ▼                        ▼                 │
+│  ┌────────────────┐      ┌────────────────┐      ┌─────────────────┐        │
+│  │ RESEARCH       │      │ PROFESSOR      │      │ DOCUMENT        │        │
+│  │ DOMAIN AGENT   │      │ MATCHING AGENT │      │ AGENT           │        │
+│  │                │      │                │      │                 │        │
+│  │ • Research fit │      │ • Faculty      │      │ • SOP           │        │
+│  │ • Domain       │      │ • Research     │      │ • LOR           │        │
+│  │ • Skill gaps   │      │ • Similarity   │      │ • Email         │        │
+│  │ • Trends       │      │ • Funding      │      │ • CV Feedback   │        │
+│  └───────┬────────┘      └───────┬────────┘      └────────┬────────┘        │
 │          │                        │                        │                │
 │          └────────────────────────┼────────────────────────┘                │
 │                                   ▼                                         │
@@ -146,10 +146,10 @@ URL) or explicitly marked unverified. Nothing is invented.
                                      │
                                      ▼
                          ┌─────────────────────────┐
-                         │       DATABASE           │
+                         │       DATABASE          │
                          │                         │
-                         │       SQLite /           │
-                         │       PostgreSQL         │
+                         │       SQLite /          │
+                         │       PostgreSQL        │
                          │                         │
                          │ • Students              │
                          │ • Sessions              │

@@ -83,11 +83,11 @@ def test_is_non_retryable_client_error() -> None:
         assert _is_non_retryable_client_error(exc) is expected
 
 
-def test_is_retryable_excludes_quota_and_4xx() -> None:
+def test_is_retryable_retries_429_and_5xx_excludes_4xx() -> None:
     def _exc(code):
         return httpx.HTTPStatusError("boom", request=httpx.Request("POST", _URL), response=_error_response(code))
 
-    assert _is_retryable(_exc(429)) is False
+    assert _is_retryable(_exc(429)) is True
     assert _is_retryable(_exc(400)) is False
     assert _is_retryable(_exc(404)) is False
     assert _is_retryable(_exc(503)) is True
@@ -116,7 +116,7 @@ def test_generate_404_does_not_retry_and_raises_llmerror(mock_provider: OpenRout
     assert mock_provider._client.post.call_count == 1
 
 
-def test_generate_429_raises_quota_error_without_retry(mock_provider: OpenRouterProvider) -> None:
+def test_generate_429_retries_and_raises_quota_error_when_exhausted(mock_provider: OpenRouterProvider) -> None:
     mock_provider._client.post.return_value = _error_response(429, "Quota exceeded", headers={"retry-after": "27"})
 
     with pytest.raises(LLMQuotaError) as exc_info:
@@ -126,19 +126,28 @@ def test_generate_429_raises_quota_error_without_retry(mock_provider: OpenRouter
     assert err.status_code == 429
     assert err.retry_after == 27
     assert err.provider == "openrouter"
-    assert mock_provider._client.post.call_count == 1
+    assert mock_provider._client.post.call_count == 4
 
 
-def test_generate_5xx_retries_once(mock_provider: OpenRouterProvider) -> None:
+def test_generate_429_then_success_succeeds(mock_provider: OpenRouterProvider) -> None:
+    """First call 429, second attempt succeeds."""
     mock_provider._client.post.side_effect = [
-        _error_response(503, "transient"),
-        _error_response(503, "still down"),
+        _error_response(429, "Rate limit"),
+        _success_response("recovered text"),
     ]
+
+    result = mock_provider.generate("hi")
+    assert result.text == "recovered text"
+    assert mock_provider._client.post.call_count == 2
+
+
+def test_generate_5xx_retries_and_raises_when_exhausted(mock_provider: OpenRouterProvider) -> None:
+    mock_provider._client.post.return_value = _error_response(503, "transient")
 
     with pytest.raises(LLMError):
         mock_provider.generate("hi")
 
-    assert mock_provider._client.post.call_count == 2
+    assert mock_provider._client.post.call_count == 4
 
 
 def test_generate_5xx_then_success_succeeds(mock_provider: OpenRouterProvider) -> None:

@@ -45,15 +45,12 @@ def _is_non_retryable_client_error(exc: BaseException) -> bool:
 
 
 def _is_retryable(exc: BaseException) -> bool:
-    """Tenacity predicate: only retry transient 5xx errors.
-
-    Quota errors and non-retryable client errors are explicitly excluded so
-    we do not consume additional quota on every attempt.
-    """
-    if _is_quota_error(exc):
-        return False
+    """Tenacity predicate: retry transient 5xx errors and 429 rate limit bursts
+    with backoff."""
     if _is_non_retryable_client_error(exc):
         return False
+    if _is_quota_error(exc):
+        return True
     return _is_transient_5xx(exc)
 
 
@@ -81,30 +78,27 @@ def _extract_retry_after_seconds(response: httpx.Response) -> int | None:
 def _build_quota_error(exc: httpx.HTTPStatusError, *, provider: str, model: str | None) -> LLMQuotaError:
     message = _extract_error_message(exc.response)
     return LLMQuotaError(
-        f"OpenRouter quota/rate limit exhausted for model {model or 'unknown'}: {message}",
+        f"OpenRouter rate limit exhausted for model {model or 'unknown'}: {message}",
         provider=provider,
         model=model,
         status_code=exc.response.status_code,
-        retry_after=_extract_retry_after_seconds(exc.response),
+        retry_after=_extract_retry_after_seconds(exc.response) or 30,
         quota_message=message,
     )
 
 
 def _log_retry_attempt(retry_state: RetryCallState) -> None:
-    """Hook used by tenacity to log transient retries for observability.
-
-    Quota (429) errors are excluded from the retry predicate entirely, so
-    this only ever fires for transient 5xx errors, and at most once given
-    ``stop_after_attempt(2)``.
-    """
+    """Hook used by tenacity to log transient retries for observability."""
     ctx = retry_state.kwargs.get("context") if retry_state.kwargs else None
     fields = ctx.fields() if isinstance(ctx, LLMCallContext) else {}
     exc = retry_state.outcome.exception() if retry_state.outcome else None
+    status_code = getattr(getattr(exc, "response", None), "status_code", None)
     _logger.warning(
         "openrouter_transient_retry",
         attempt=retry_state.attempt_number,
         next_attempt=retry_state.attempt_number + 1,
         next_sleep=round(retry_state.next_action.sleep, 2) if retry_state.next_action else None,
+        status_code=status_code,
         error_type=exc.__class__.__name__ if exc else None,
         **fields,
     )
@@ -262,8 +256,8 @@ class OpenRouterProvider:
 
     @retry(
         retry=retry_if_exception(_is_retryable),
-        wait=wait_exponential_jitter(initial=0.5, max=8, jitter=1),
-        stop=stop_after_attempt(2),
+        wait=wait_exponential_jitter(initial=2.0, max=12, jitter=1.0),
+        stop=stop_after_attempt(4),
         reraise=True,
         before_sleep=_log_retry_attempt,
     )
@@ -329,18 +323,28 @@ class OpenRouterProvider:
         )
         return text, usage
 
+    @retry(
+        retry=retry_if_exception(_is_retryable),
+        wait=wait_exponential_jitter(initial=1.5, max=10, jitter=1.0),
+        stop=stop_after_attempt(3),
+        reraise=True,
+        before_sleep=_log_retry_attempt,
+    )
+    def _post_embedding(self, model_name: str, text: str) -> dict[str, Any]:
+        response = self.client.post(
+            "/embeddings",
+            json={
+                "model": model_name,
+                "input": text,
+            },
+        )
+        response.raise_for_status()
+        return response.json()
+
     def embed_text(self, text: str, *, model: str | None = None) -> list[float]:
         model_name = model or settings.embedding_model
         try:
-            response = self.client.post(
-                "/embeddings",
-                json={
-                    "model": model_name,
-                    "input": text,
-                },
-            )
-            response.raise_for_status()
-            body = response.json()
+            body = self._post_embedding(model_name, text)
         except httpx.HTTPStatusError as exc:
             if _is_quota_error(exc):
                 raise _build_quota_error(exc, provider="openrouter", model=model_name) from exc

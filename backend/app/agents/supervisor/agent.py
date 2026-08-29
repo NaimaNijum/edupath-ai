@@ -70,7 +70,8 @@ MEMORY: {json.dumps(state.get('memory_references', []), default=str)}"""
                 decision, _ = provider.generate_structured(
                     prompt, response_model=SupervisorDecision, context=call_context
                 )
-                plan = [agent for agent in decision.execution_plan if agent in ALL_AGENTS] or build_execution_plan(request)
+                profile_ctx = state.get("profile") or {}
+                plan = [agent for agent in decision.execution_plan if agent in ALL_AGENTS] or build_execution_plan(request, profile_ctx)
                 reason = decision.reason
                 call_count = call_number
             except LLMQuotaError:
@@ -81,7 +82,8 @@ MEMORY: {json.dumps(state.get('memory_references', []), default=str)}"""
             except LLMError as exc:
                 # Provider failure is visible to callers; this constrained fallback
                 # keeps the workflow operable without pretending the model decided.
-                plan = build_execution_plan(request)
+                profile_ctx = state.get("profile") or {}
+                plan = build_execution_plan(request, profile_ctx)
                 reason = "Provider unavailable; using safe fallback plan."
                 errors = errors + [f"Supervisor provider failure: {exc}"]
 

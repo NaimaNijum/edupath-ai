@@ -39,33 +39,40 @@ def ensure_approval_gate(plan: list[str]) -> list[str]:
     return plan
 
 
-def build_execution_plan(user_request: str) -> list[str]:
+def build_execution_plan(user_request: str, profile: dict | None = None) -> list[str]:
     """
-    Build a lightweight deterministic execution plan from the user's request.
-
-    The LLM Supervisor will eventually replace this rule-based planner.
-    For now, this gives us predictable and testable workflow behavior.
+    Build a lightweight deterministic execution plan from the user's request
+    and student profile. Tailors required agents based on degree level
+    (Undergraduate vs. Masters vs. PhD).
     """
-
     request = user_request.lower()
+    profile = profile or {}
+    target_degree = str(profile.get("target_degree") or "").lower()
 
     plan: list[str] = ["profile_agent"]
 
-    phd_or_research_request = any(
-        keyword in request
-        for keyword in (
-            "phd",
-            "doctorate",
-            "research",
-            "ai",
-            "ml",
-            "machine learning",
-            "supervisor",
-            "advisor",
-            "professor",
-            "faculty",
-        )
+    is_undergrad = any(k in target_degree for k in ("undergrad", "bachelor", "bs", "ba")) or (
+        any(k in request for k in ("undergraduate", "bachelor", "freshman")) and not any(k in request for k in ("phd", "master", "ms"))
     )
+
+    phd_or_research_request = (
+        any(k in target_degree for k in ("phd", "doctorate", "doctoral"))
+        or any(
+            keyword in request
+            for keyword in (
+                "phd",
+                "doctorate",
+                "research",
+                "ai",
+                "ml",
+                "machine learning",
+                "supervisor",
+                "advisor",
+                "professor",
+                "faculty",
+            )
+        )
+    ) and not is_undergrad
 
     # Scholarship / funding search
     if any(
@@ -78,21 +85,13 @@ def build_execution_plan(user_request: str) -> list[str]:
             "financial aid",
             "stipend",
         )
-    ):
-        plan.extend(
-            [
-                "professor_agent",
-                "university_agent",
-                "scholarship_agent",
-                "eligibility_agent",
-            ]
-        )
+    ) or profile.get("preferred_funding"):
+        plan.extend(["university_agent", "scholarship_agent", "eligibility_agent"])
+        if phd_or_research_request:
+            plan.append("professor_agent")
 
-    if phd_or_research_request and "professor_agent" not in plan:
-        plan.append("professor_agent")
-
-    # Professor / supervisor search
-    if any(
+    # Professor / supervisor search (PhD / Research focus)
+    if not is_undergrad and any(
         keyword in request
         for keyword in (
             "professor",
@@ -100,46 +99,25 @@ def build_execution_plan(user_request: str) -> list[str]:
             "advisor",
             "faculty",
             "research group",
+            "lab",
         )
     ):
-        plan.extend(
-            [
-                "professor_agent",
-                "university_agent",
-                "eligibility_agent",
-            ]
-        )
+        plan.extend(["professor_agent", "university_agent", "eligibility_agent"])
 
     # University / program discovery
-    if any(
-        keyword in request
-        for keyword in (
-            "university",
-            "universities",
-            "program",
-            "ms",
-            "master",
-            "masters",
-            "phd",
-            "undergraduate",
-            "bachelor",
-        )
-    ):
-        if "university_agent" not in plan:
-            plan.append("university_agent")
-
-    if phd_or_research_request and "university_agent" not in plan:
+    if "university_agent" not in plan:
         plan.append("university_agent")
 
-    if phd_or_research_request and "scholarship_agent" not in plan:
-        plan.append("scholarship_agent")
+    if phd_or_research_request:
+        if "professor_agent" not in plan:
+            plan.append("professor_agent")
+        if "scholarship_agent" not in plan:
+            plan.append("scholarship_agent")
+        if "eligibility_agent" not in plan:
+            plan.append("eligibility_agent")
 
-    if phd_or_research_request and "eligibility_agent" not in plan:
-        plan.append("eligibility_agent")
-
-    # Research alignment scoring should run whenever we have candidates
-    # worth scoring (i.e. whenever eligibility review is also happening).
-    if "eligibility_agent" in plan and "research_match_agent" not in plan:
+    # Research alignment scoring for Masters/PhD
+    if "eligibility_agent" in plan and not is_undergrad and "research_match_agent" not in plan:
         plan.append("research_match_agent")
 
     # SOP generation
@@ -149,11 +127,9 @@ def build_execution_plan(user_request: str) -> list[str]:
             "sop",
             "statement of purpose",
             "personal statement",
+            "essay",
         )
-    ):
-        plan.append("sop_agent")
-
-    if phd_or_research_request and "sop_agent" not in plan:
+    ) or phd_or_research_request:
         plan.append("sop_agent")
 
     # Verification and ranking happen after research-oriented agents, and

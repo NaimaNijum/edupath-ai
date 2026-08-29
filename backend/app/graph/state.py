@@ -50,6 +50,7 @@ class EduPathState(TypedDict, total=False):
     workflow_status: str
     approval_status: str
     profile: dict
+    profile_analysis: dict
     agent_results: Annotated[list[AgentResult], _append]
     agent_messages: Annotated[list[AgentMessage], _append]
     memory_references: Annotated[list[dict], _append]
