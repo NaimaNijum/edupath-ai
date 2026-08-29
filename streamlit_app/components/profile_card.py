@@ -8,9 +8,10 @@ def _html(content: str) -> None:
     st.markdown(textwrap.dedent(content).strip(), unsafe_allow_html=True)
 
 
-def render_profile_summary(profile: dict) -> None:
+def render_profile_summary(profile: dict | None) -> None:
     """Academic profile summary as a badge/field grid. Only renders fields
     the backend actually returned."""
+    profile = profile or {}
     with st.container(key="profile-summary-card", border=True):
         row1 = st.columns(3)
         _field(row1[0], "Current Degree", profile.get("current_degree"))

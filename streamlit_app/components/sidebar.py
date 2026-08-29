@@ -6,7 +6,6 @@ from api.client import check_health_cached
 from api.exceptions import BackendError
 from components.auth import render_logout_button
 from components.common import render_html
-from utils.config import BACKEND_URL
 from utils.formatting import initials
 
 
@@ -33,7 +32,7 @@ def render_sidebar_footer() -> None:
     """Integrated student account card + live backend status pill at the sidebar bottom."""
     with st.sidebar:
         user = st.session_state.get("current_user")
-        profile = st.session_state.get("profile")
+        profile = st.session_state.get("profile") or {}
 
         render_html('<div class="ep-sidebar-divider" style="margin-top: 1rem; margin-bottom: 0.85rem;"></div>')
 
