@@ -18,6 +18,7 @@ from app.schemas.workflow import (
     WorkflowExecutionResponse,
     WorkflowRead,
 )
+from app.services.catalog_sync import CatalogSyncService
 from app.services.memory import MemoryService
 from app.services.tooling import ToolingService
 
@@ -35,11 +36,13 @@ class WorkflowService:
         graph=None,
         memory_service: MemoryService | None = None,
         tooling_service: ToolingService | None = None,
+        catalog_sync_service: CatalogSyncService | None = None,
     ) -> None:
         self._graph = graph or build_graph(provider=provider)
         self._repository = repository or WorkflowRepository()
         self._memory_service = memory_service or MemoryService()
         self._tooling_service = tooling_service or ToolingService()
+        self._catalog_sync_service = catalog_sync_service or CatalogSyncService()
 
     async def execute(self, session: AsyncSession, request: WorkflowCreateRequest) -> WorkflowExecutionResponse:
         profile_id = UUID(request.student_profile_id) if request.student_profile_id else None
@@ -172,6 +175,15 @@ class WorkflowService:
             "token_usage": self._repository.summarize_token_usage(result.get("agent_results", [])),
             "estimated_cost_usd": self._repository.summarize_cost(result.get("agent_results", [])),
         })
+
+        # Persist discovered candidates into the real catalog tables *before*
+        # save_workflow_result's commit, in the same transaction -- so the
+        # Catalog/Dashboard reflect what this run found as soon as it's
+        # found, whether the run is paused awaiting approval or complete.
+        # Approval gates SOP generation, not whether a university "exists".
+        candidates = result.get("candidate_opportunities") or []
+        if candidates:
+            await self._catalog_sync_service.sync_candidates_to_catalog(session, candidates)
 
         await self._repository.save_workflow_result(session, workflow_id, response, raw_state=result, completed_at=completed_at)
 

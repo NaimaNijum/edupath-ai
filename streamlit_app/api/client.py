@@ -18,11 +18,13 @@ __all__ = [
     "logout",
     "create_profile",
     "get_profile",
+    "get_my_profile",
     "update_profile",
     "upload_document",
     "list_documents",
     "delete_document",
     "create_workflow",
+    "analyze_counseling",
     "get_workflow",
     "list_workflows",
     "approve_workflow",
@@ -153,6 +155,10 @@ def get_profile(profile_id: str) -> dict:
     return _request("GET", f"/api/v1/profiles/{profile_id}")
 
 
+def get_my_profile() -> dict | None:
+    return _request("GET", "/api/v1/profiles/me")
+
+
 def update_profile(profile_id: str, payload: dict) -> dict:
     return _request("PATCH", f"/api/v1/profiles/{profile_id}", json=payload)
 
@@ -188,6 +194,12 @@ def create_workflow(payload: dict) -> dict:
     # POST /api/v1/workflows runs the full LangGraph workflow synchronously
     # (several sequential Gemini calls), so it needs a long client timeout.
     return _request("POST", "/api/v1/workflows", json=payload, timeout=WORKFLOW_TIMEOUT_SECONDS)
+
+
+def analyze_counseling(payload: dict) -> dict:
+    """Compatibility wrapper for the counseling-style design while reusing the
+    same workflow engine behind the scenes."""
+    return _request("POST", "/api/v1/counseling/analyze", json=payload, timeout=WORKFLOW_TIMEOUT_SECONDS)
 
 
 def get_workflow(workflow_id: str) -> dict:

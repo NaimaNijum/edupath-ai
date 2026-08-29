@@ -1,21 +1,24 @@
+"""GeminiProvider is embeddings-only (text generation moved to OpenRouter,
+see test_llm_openrouter.py). These tests cover embed_text's response
+handling."""
 
-import json
 from unittest.mock import MagicMock
 
 import pytest
-from pydantic import BaseModel, Field
 
 from app.core.exceptions import LLMError
 from app.llm.gemini import GeminiProvider
 
-class MockGeminiResponse:
-    def __init__(self, text, usage_metadata=None):
-        self.text = text
-        self.usage_metadata = usage_metadata or {"prompt_token_count": 10, "candidates_token_count": 20, "total_token_count": 30}
 
-class SampleModel(BaseModel):
-    name: str
-    value: int
+class MockEmbedding:
+    def __init__(self, values):
+        self.values = values
+
+
+class MockEmbedResponse:
+    def __init__(self, values):
+        self.embeddings = [MockEmbedding(values)] if values is not None else []
+
 
 @pytest.fixture
 def mock_gemini_client():
@@ -24,51 +27,28 @@ def mock_gemini_client():
     provider._client = mock_client
     return provider, mock_client
 
-def test_generate_structured_with_markdown_fences(mock_gemini_client):
-    """Verify that JSON wrapped in markdown code fences is parsed correctly."""
+
+def test_embed_text_returns_values(mock_gemini_client):
     provider, mock_client = mock_gemini_client
-    response_text = '```json\n{"name": "test", "value": 123}\n```'
-    mock_client.models.generate_content.return_value = MockGeminiResponse(response_text)
+    mock_client.models.embed_content.return_value = MockEmbedResponse([0.1] * 1536)
 
-    structured_result, _ = provider.generate_structured("some prompt", response_model=SampleModel)
+    values = provider.embed_text("some text")
 
-    assert structured_result.name == "test"
-    assert structured_result.value == 123
+    assert len(values) == 1536
+    assert values[0] == pytest.approx(0.1)
 
-def test_generate_structured_with_plain_json(mock_gemini_client):
-    """Verify that plain JSON is parsed correctly."""
+
+def test_embed_text_missing_values_raises_llmerror(mock_gemini_client):
     provider, mock_client = mock_gemini_client
-    response_text = '{"name": "test", "value": 123}'
-    mock_client.models.generate_content.return_value = MockGeminiResponse(response_text)
+    mock_client.models.embed_content.return_value = MockEmbedResponse(None)
 
-    structured_result, _ = provider.generate_structured("some prompt", response_model=SampleModel)
+    with pytest.raises(LLMError, match="missing values"):
+        provider.embed_text("some text")
 
-    assert structured_result.name == "test"
-    assert structured_result.value == 123
-    
-def test_generate_structured_empty_response(mock_gemini_client):
-    """Verify an empty response raises an LLMError."""
+
+def test_embed_text_dimension_mismatch_raises_llmerror(mock_gemini_client):
     provider, mock_client = mock_gemini_client
-    mock_client.models.generate_content.return_value = MockGeminiResponse("")
+    mock_client.models.embed_content.return_value = MockEmbedResponse([0.1] * 10)  # not 1536
 
-    with pytest.raises(LLMError, match="Gemini returned an empty response"):
-        provider.generate_structured("some prompt", response_model=SampleModel)
-
-def test_generate_structured_invalid_json(mock_gemini_client):
-    """Verify that invalid JSON raises an LLMError."""
-    provider, mock_client = mock_gemini_client
-    response_text = '{"name": "test", "value": 123,}' # Trailing comma is invalid
-    mock_client.models.generate_content.return_value = MockGeminiResponse(response_text)
-
-    with pytest.raises(LLMError, match="Invalid JSON response from Gemini"):
-        provider.generate_structured("some prompt", response_model=SampleModel)
-
-def test_generate_structured_validation_error(mock_gemini_client):
-    """Verify that a schema mismatch raises a Pydantic validation error."""
-    provider, mock_client = mock_gemini_client
-    # 'value' must be an integer, but the model receives an array.
-    response_text = '{"name": "test", "value": [1, 2, 3]}'
-    mock_client.models.generate_content.return_value = MockGeminiResponse(response_text)
-
-    with pytest.raises(LLMError, match="Gemini response failed Pydantic validation"):
-        provider.generate_structured("some prompt", response_model=SampleModel)
+    with pytest.raises(LLMError, match="dimension mismatch"):
+        provider.embed_text("some text")

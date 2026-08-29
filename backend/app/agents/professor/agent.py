@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from app.agents.context import candidates_from_tool_results, ensure_llm_budget, grounded_context
 from app.core.config import settings
 from app.core.exceptions import LLMError, LLMQuotaError
-from app.llm.gemini import get_gemini_provider
+from app.llm.openrouter import get_openrouter_provider
 from app.llm.usage import serialize_usage
 from app.schemas.agent import AgentMessage, AgentResult
 
@@ -22,7 +22,7 @@ class ProfessorAgentOutput(BaseModel):
 
 
 def build_professor_agent(provider=None):
-    provider = provider or get_gemini_provider()
+    provider = provider or get_openrouter_provider()
 
     def professor_agent(state: dict) -> dict:
         user_request = state.get("user_request") or state.get("user_input", "")
@@ -30,7 +30,9 @@ def build_professor_agent(provider=None):
         started_at = datetime.now(UTC)
         call_number, call_context = ensure_llm_budget(state, agent_name="professor_agent", purpose="professor_matching")
 
-        candidates = candidates_from_tool_results(state, {"professor_search"}, created_by="professor_agent")
+        candidates = candidates_from_tool_results(
+            state, {"professor_search", "faculty_directory_search"}, created_by="professor_agent"
+        )
 
         prompt = f"""
 You are EduPath AI's Professor/Supervisor Search Agent.
@@ -42,7 +44,7 @@ Student request:
 
 Profile context:
 {profile}
-{grounded_context(state, {"professor_search", "university_search", "web_search"})}
+{grounded_context(state, {"professor_search", "faculty_directory_search", "university_search", "web_search"})}
 
 {len(candidates)} candidate professors were found via database/search tools (already extracted
 separately -- do not restate them as structured data). Never invent a professor's name, email,
@@ -55,7 +57,7 @@ Return JSON with summary, key_findings, recommended_next_agent, supervisor_messa
             structured, raw_result = provider.generate_structured(
                 prompt,
                 response_model=ProfessorAgentOutput,
-                model=settings.gemini_model,
+                model=settings.openrouter_model,
                 context=call_context,
             )
         except LLMQuotaError:

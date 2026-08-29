@@ -7,7 +7,7 @@ class ConfigurationError(EduPathError):
 
 
 class LLMError(EduPathError):
-    """Raised when the Gemini provider cannot complete a request."""
+    """Raised when the configured LLM provider cannot complete a request."""
 
 
 class LLMQuotaError(LLMError):

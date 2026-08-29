@@ -11,11 +11,12 @@ from app.tools.web_search import WebSearchTool
 
 
 class FakeUniversity:
-    def __init__(self, name: str, country: str = "USA", website_url: str | None = None, description: str | None = None) -> None:
+    def __init__(self, name: str, country: str = "USA", website_url: str | None = None, description: str | None = None, faculty_directory_url: str | None = None) -> None:
         self.name = name
         self.country = country
         self.website_url = website_url
         self.description = description
+        self.faculty_directory_url = faculty_directory_url
 
 
 class FakeProfessor:

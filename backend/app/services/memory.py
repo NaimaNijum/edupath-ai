@@ -10,7 +10,7 @@ from app.schemas.memory import MemoryRead
 from app.database.models.entities import Memory
 from app.core.config import settings
 from app.core.exceptions import LLMError
-from app.llm.gemini import get_gemini_provider
+from app.llm.openrouter import get_openrouter_provider
 
 
 class MemoryService:
@@ -49,7 +49,7 @@ class MemoryService:
         content = {"last_request": user_request, "profile_signals": profile or {}, "workflow_id": workflow_id}
         embedding = None
         try:
-            embedding = get_gemini_provider().embed_text(user_request, model=settings.embedding_model)
+            embedding = get_openrouter_provider().embed_text(user_request, model=settings.embedding_model)
         except LLMError:
             # Persistence remains useful if embeddings are temporarily unavailable.
             pass

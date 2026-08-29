@@ -44,13 +44,129 @@ URL) or explicitly marked unverified. Nothing is invented.
 
 ## Architecture
 
-```
-Streamlit Frontend  →  FastAPI REST API  →  LangGraph Multi-Agent Workflow  →  PostgreSQL + pgvector
-                                          →  Gemini (google-genai)             Redis (auth/session)
+```text
+┌──────────────────────────────────────┐
+│          🎓 EduPath AI               │
+│  Multi-Agent Study Abroad Counselor │
+└──────────────────┬───────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         PRESENTATION LAYER                                  │
+│                                                                             │
+│                         ┌──────────────────┐                                │
+│                         │    Streamlit     │                                │
+│                         │   Interactive UI │                                │
+│                         └────────┬─────────┘                                │
+│                                  │ HTTP / SSE                                │
+└──────────────────────────────────┼──────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           FASTAPI BACKEND                                   │
+│                                                                             │
+│  ┌────────────────┐  ┌────────────────┐  ┌──────────────────────────────┐  │
+│  │ Profile API    │  │ Counseling API │  │ HITL / Approval API           │  │
+│  └────────────────┘  └───────┬────────┘  └──────────────────────────────┘  │
+│                              │                                              │
+│                              ▼                                              │
+│                    ┌──────────────────────┐                                 │
+│                    │   Session Manager    │                                 │
+│                    └──────────┬───────────┘                                 │
+└───────────────────────────────┼─────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         LANGGRAPH ORCHESTRATION                             │
+│                                                                             │
+│                    ┌──────────────────────────────┐                         │
+│                    │      SUPERVISOR AGENT       │                         │
+│                    │                              │                         │
+│                    │ • Understand user request    │                         │
+│                    │ • Analyze degree level       │                         │
+│                    │ • Route tasks                │                         │
+│                    │ • Coordinate agents          │                         │
+│                    │ • Monitor workflow           │                         │
+│                    └──────────────┬───────────────┘                         │
+│                                   │                                         │
+│          ┌────────────────────────┼────────────────────────┐                │
+│          │                        │                        │                │
+│          ▼                        ▼                        ▼                │
+│  ┌────────────────┐      ┌────────────────┐      ┌─────────────────┐       │
+│  │ PROFILE        │      │ UNIVERSITY     │      │ SCHOLARSHIP     │       │
+│  │ ANALYST AGENT  │      │ RESEARCH AGENT │      │ AGENT           │       │
+│  │                │      │                │      │                 │       │
+│  │ • CGPA         │      │ • Programs     │      │ • Scholarships  │       │
+│  │ • Skills       │      │ • Universities │      │ • Funding       │       │
+│  │ • Experience   │      │ • Ranking      │      │ • Eligibility   │       │
+│  │ • Strengths    │      │ • Requirements │      │ • Deadlines     │       │
+│  └───────┬────────┘      └───────┬────────┘      └────────┬────────┘       │
+│          │                        │                        │                │
+│          │                        │                        │                │
+│          ▼                        ▼                        ▼                │
+│  ┌────────────────┐      ┌────────────────┐      ┌─────────────────┐       │
+│  │ RESEARCH       │      │ PROFESSOR      │      │ DOCUMENT        │       │
+│  │ DOMAIN AGENT   │      │ MATCHING AGENT │      │ AGENT           │       │
+│  │                │      │                │      │                 │       │
+│  │ • Research fit │      │ • Faculty      │      │ • SOP           │       │
+│  │ • Domain       │      │ • Research     │      │ • LOR           │       │
+│  │ • Skill gaps   │      │ • Similarity   │      │ • Email         │       │
+│  │ • Trends       │      │ • Funding      │      │ • CV Feedback   │       │
+│  └───────┬────────┘      └───────┬────────┘      └────────┬────────┘       │
+│          │                        │                        │                │
+│          └────────────────────────┼────────────────────────┘                │
+│                                   ▼                                         │
+│                     ┌──────────────────────────┐                            │
+│                     │ RECOMMENDATION AGENT     │                            │
+│                     │                          │                            │
+│                     │ • University ranking     │                            │
+│                     │ • Profile fit            │                            │
+│                     │ • Funding fit            │                            │
+│                     │ • Research fit           │                            │
+│                     │ • Reach / Target / Safe  │                            │
+│                     └────────────┬─────────────┘                            │
+│                                  │                                          │
+└──────────────────────────────────┼──────────────────────────────────────────┘
+                                   │
+             ┌─────────────────────┼──────────────────────┐
+             │                     │                      │
+             ▼                     ▼                      ▼
+┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
+│      TOOL LAYER      │  │    MEMORY / RAG      │  │   OBSERVABILITY      │
+│                      │  │                      │  │                      │
+│ • Web Search         │  │ • Student Memory     │  │ • Agent Logs         │
+│ • University Search  │  │ • Conversation       │  │ • Agent Trace        │
+│ • Scholarship Search │  │ • Previous Results   │  │ • Token Usage        │
+│ • Professor Search   │  │ • Knowledge Base     │  │ • Cost Estimation    │
+│ • Python Analysis    │  │ • RAG Retrieval      │  │ • Error Handling     │
+│ • External APIs      │  │                      │  │ • Execution Time     │
+└──────────┬───────────┘  └──────────┬───────────┘  └──────────┬───────────┘
+           │                         │                         │
+           └─────────────────────────┼─────────────────────────┘
+                                     │
+                                     ▼
+                         ┌─────────────────────────┐
+                         │       DATABASE           │
+                         │                         │
+                         │       SQLite /           │
+                         │       PostgreSQL         │
+                         │                         │
+                         │ • Students              │
+                         │ • Sessions              │
+                         │ • Agent Messages        │
+                         │ • Agent Runs            │
+                         │ • Memories              │
+                         │ • Recommendations       │
+                         │ • Documents             │
+                         │ • Human Feedback        │
+                         └─────────────────────────┘
 ```
 
-The frontend never talks to Gemini directly — every AI action goes through the backend. See
-[`docs/architecture.md`](docs/architecture.md) for the full system design and
+The frontend never talks to Gemini directly — every AI action goes through the backend. The
+system combines a Streamlit client, FastAPI API, LangGraph orchestration, structured tool data,
+and a persistent database/memory layer to produce evidence-backed recommendations and human-in-the-loop SOP generation.
+
+See [`docs/architecture.md`](docs/architecture.md) for the full system design and
 [`docs/workflow.md`](docs/workflow.md) for the LangGraph graph in detail.
 
 ## Multi-Agent Architecture

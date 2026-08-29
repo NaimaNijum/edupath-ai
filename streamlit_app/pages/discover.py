@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from api.client import BackendError, create_workflow, list_opportunities
+from api.client import BackendError, analyze_counseling, list_opportunities, list_opportunities_cached
 from components.common import render_backend_error, section_header
 from components.empty_state import render_empty_state
 from components.header import render_page_header
@@ -122,7 +122,7 @@ def _run_workflow(profile_id: str, user_request: str) -> None:
             "This step runs on the server and can take up to two minutes."
         )
         try:
-            result = create_workflow(payload)
+            result = analyze_counseling(payload)
         except BackendError as error:
             st.session_state["workflow_error"] = error
             st.session_state["workflow_result"] = None
@@ -133,6 +133,13 @@ def _run_workflow(profile_id: str, user_request: str) -> None:
 
     st.session_state["workflow_result"] = result
     st.session_state["current_workflow_id"] = result.get("workflow_id")
+    # Discovered universities/professors/opportunities are now persisted
+    # into the real catalog by the backend (CatalogSyncService) -- clear
+    # both catalog caches (this page's session_state gate and the
+    # Dashboard's TTL cache) so the very next render re-fetches and shows
+    # them, instead of silently sitting stale until a manual Refresh.
+    st.session_state["opportunities"] = None
+    list_opportunities_cached.clear()
     st.rerun()
 
 

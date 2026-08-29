@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-import json
 import re
-from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, TypeVar
+from typing import Any
 
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
-from pydantic import BaseModel, ValidationError
 from tenacity import (
     RetryCallState,
     retry,
@@ -21,38 +18,11 @@ from tenacity import (
 from app.core.config import settings
 from app.core.exceptions import LLMError, LLMQuotaError
 from app.core.logging import get_logger
-from app.llm.usage import TokenUsage, estimate_cost_usd
+from app.llm.base import LLMCallContext, LLMResult
 
-T = TypeVar("T", bound=BaseModel)
+__all__ = ["LLMCallContext", "LLMResult", "GeminiProvider", "get_gemini_provider"]
 
 _logger = get_logger(component="llm")
-
-
-@dataclass(slots=True)
-class LLMResult:
-    text: str
-    usage: TokenUsage
-
-
-@dataclass(slots=True)
-class LLMCallContext:
-    """Request-level metadata attached to a Gemini call purely for
-    observability. Never sent to the Gemini API and must never carry API
-    keys or raw user content.
-    """
-
-    workflow_id: str | None = None
-    agent_name: str | None = None
-    purpose: str | None = None
-    call_number: int | None = None
-
-    def fields(self) -> dict[str, Any]:
-        return {
-            "workflow_id": self.workflow_id,
-            "agent_name": self.agent_name,
-            "purpose": self.purpose,
-            "call_number": self.call_number,
-        }
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +167,13 @@ def _log_retry_attempt(retry_state: RetryCallState) -> None:
 
 
 class GeminiProvider:
+    """Embeddings-only provider. Text generation moved to OpenRouter -- see
+    app/llm/openrouter.py -- because Gemini's free tier is too quota-limited
+    for the app's generation call volume. Embeddings stayed here since
+    OpenRouter has no $0 embedding model and embedding call volume is much
+    lower.
+    """
+
     def __init__(self) -> None:
         self._client: genai.Client | None = None
 
@@ -205,181 +182,6 @@ class GeminiProvider:
         if self._client is None:
             self._client = genai.Client(api_key=settings.gemini_api_key)
         return self._client
-
-    def generate(
-        self,
-        prompt: str,
-        *,
-        model: str | None = None,
-        temperature: float | None = None,
-        system_instruction: str | None = None,
-        context: LLMCallContext | None = None,
-    ) -> LLMResult:
-        model_name = model or settings.gemini_model
-        ctx = context or LLMCallContext(purpose="generate")
-        attempt_counter: dict[str, int] = {}
-
-        try:
-            response = self._generate_content(
-                model_name,
-                prompt,
-                temperature=temperature,
-                system_instruction=system_instruction,
-                json_mode=False,
-                context=ctx,
-                attempt_counter=attempt_counter,
-            )
-        except LLMError:
-            raise
-        except genai_errors.APIError as exc:
-            if _is_quota_error(exc):
-                _logger.warning("gemini_call_quota_exhausted", model=model_name, **ctx.fields())
-                raise _build_quota_error(exc, provider="gemini", model=model_name) from exc
-            _logger.warning("gemini_call_failed", model=model_name, error_type=exc.__class__.__name__, **ctx.fields())
-            raise LLMError(f"Gemini request failed: {exc}") from exc
-        except Exception as exc:  # pragma: no cover - exercised through higher-level tests
-            _logger.warning("gemini_call_failed", model=model_name, error_type=exc.__class__.__name__, **ctx.fields())
-            raise LLMError(f"Gemini request failed: {exc}") from exc
-
-        usage = self._extract_usage(response, model_name)
-        text = getattr(response, "text", "") or ""
-        _logger.info("gemini_call_success", model=model_name, total_tokens=usage.total_tokens, **ctx.fields())
-        return LLMResult(text=text, usage=usage)
-
-    @retry(
-        retry=retry_if_exception(_is_retryable),
-        wait=wait_exponential_jitter(initial=0.5, max=8, jitter=1),
-        stop=stop_after_attempt(2),
-        reraise=True,
-        before_sleep=_log_retry_attempt,
-    )
-    def _generate_content(
-        self,
-        model_name: str,
-        prompt: str,
-        *,
-        temperature: float | None,
-        system_instruction: str | None,
-        json_mode: bool = False,
-        response_schema: type[BaseModel] | dict | None = None,
-        context: LLMCallContext | None = None,
-        attempt_counter: dict[str, int] | None = None,
-    ):
-        if attempt_counter is not None:
-            attempt_counter["count"] = attempt_counter.get("count", 0) + 1
-        attempt = attempt_counter.get("count", 1) if attempt_counter is not None else 1
-        fields = context.fields() if isinstance(context, LLMCallContext) else {}
-        _logger.info("gemini_generate_content_attempt", model=model_name, attempt=attempt, **fields)
-
-        config: dict[str, Any] = {
-            "temperature": temperature if temperature is not None else settings.gemini_temperature,
-            "http_options": {"timeout": int(settings.gemini_request_timeout_seconds * 1000)},
-            # Agents do not use function-calling tools. Disable AFC explicitly
-            # to silence the SDK's "Direct use of automatic function calling
-            # (AFC) in Models.generate_content is not recommended" warning.
-            "automatic_function_calling": genai_types.AutomaticFunctionCallingConfig(disable=True),
-        }
-        if system_instruction:
-            config["system_instruction"] = system_instruction
-        if json_mode:
-            config["response_mime_type"] = "application/json"
-        if response_schema is not None:
-            # Schema-enforced structured output. The Gemini SDK accepts a
-            # Pydantic model class directly and constrains the response to it.
-            config["response_schema"] = response_schema
-            config["response_mime_type"] = "application/json"
-
-        return self.client.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=config,
-        )
-
-    def generate_structured(
-        self,
-        prompt: str,
-        *,
-        response_model: type[T],
-        model: str | None = None,
-        temperature: float | None = None,
-        system_instruction: str | None = None,
-        context: LLMCallContext | None = None,
-    ) -> tuple[T, LLMResult]:
-        model_name = model or settings.gemini_model
-        sys_instruction = system_instruction or "Output must be valid JSON."
-        ctx = context or LLMCallContext()
-        if not ctx.purpose:
-            ctx.purpose = response_model.__name__
-        attempt_counter: dict[str, int] = {}
-
-        try:
-            response = self._generate_content(
-                model_name,
-                prompt,
-                temperature=temperature,
-                system_instruction=sys_instruction,
-                json_mode=True,
-                response_schema=response_model,
-                context=ctx,
-                attempt_counter=attempt_counter,
-            )
-        except LLMError:
-            raise
-        except genai_errors.APIError as exc:
-            if _is_quota_error(exc):
-                _logger.warning("gemini_call_quota_exhausted", model=model_name, **ctx.fields())
-                raise _build_quota_error(exc, provider="gemini", model=model_name) from exc
-            _logger.warning("gemini_call_failed", model=model_name, error_type=exc.__class__.__name__, **ctx.fields())
-            raise LLMError(
-                f"Gemini structured request failed for {response_model.__name__}: {exc}"
-            ) from exc
-        except Exception as exc:  # pragma: no cover - exercised through higher-level tests
-            _logger.warning("gemini_call_failed", model=model_name, error_type=exc.__class__.__name__, **ctx.fields())
-            raise LLMError(
-                f"Gemini structured request failed for {response_model.__name__}: {exc}"
-            ) from exc
-
-        raw_text = getattr(response, "text", "") or ""
-        if not raw_text.strip():
-            raise LLMError(f"Gemini returned an empty response for {response_model.__name__}.")
-
-        usage = self._extract_usage(response, model_name)
-        result = LLMResult(text=raw_text, usage=usage)
-        _logger.info("gemini_call_success", model=model_name, total_tokens=usage.total_tokens, **ctx.fields())
-
-        text_to_parse = self._strip_code_fence(raw_text)
-
-        try:
-            return response_model.model_validate_json(text_to_parse), result
-        except json.JSONDecodeError as exc:
-            error_msg = f"Invalid JSON response from Gemini for {response_model.__name__}. "
-            error_msg += f"Response: ```{text_to_parse[:500]}...```"
-            raise LLMError(error_msg) from exc
-        except ValidationError as exc:
-            # Pydantic raises ValidationError with type=json_invalid when the
-            # text is not valid JSON (e.g. trailing comma). Surface that as
-            # an "Invalid JSON" error so callers can distinguish parse
-            # failures from genuine schema mismatches.
-            is_json_error = any(
-                (err.get("type") or "").startswith("json_") for err in exc.errors()
-            )
-            if is_json_error:
-                error_msg = f"Invalid JSON response from Gemini for {response_model.__name__}. "
-                error_msg += f"Response: ```{text_to_parse[:500]}...```"
-                raise LLMError(error_msg) from exc
-            error_msg = f"Gemini response failed Pydantic validation for {response_model.__name__}. "
-            error_msg += f"Response: ```{text_to_parse[:500]}...```. "
-            error_msg += f"Validation Error: {exc}"
-            raise LLMError(error_msg) from exc
-
-    @staticmethod
-    def _strip_code_fence(text: str) -> str:
-        text_to_parse = text.strip()
-        if text_to_parse.startswith("```json"):
-            text_to_parse = text_to_parse.removeprefix("```json").removesuffix("```")
-        elif text_to_parse.startswith("```"):
-            text_to_parse = text_to_parse.removeprefix("```").removesuffix("```")
-        return text_to_parse.strip()
 
     def embed_text(self, text: str, *, model: str | None = None) -> list[float]:
         model_name = model or settings.embedding_model
@@ -421,25 +223,6 @@ class GeminiProvider:
                 "output_dimensionality": settings.embedding_dimensions,
                 "automatic_function_calling": genai_types.AutomaticFunctionCallingConfig(disable=True),
             },
-        )
-
-    def _extract_usage(self, response: Any, model_name: str) -> TokenUsage:
-        metadata = getattr(response, "usage_metadata", None)
-        input_tokens = int(getattr(metadata, "prompt_token_count", 0) or getattr(metadata, "input_tokens", 0) or 0)
-        output_tokens = int(getattr(metadata, "candidates_token_count", 0) or getattr(metadata, "output_tokens", 0) or 0)
-        total_tokens = int(
-            getattr(metadata, "total_token_count", 0)
-            or getattr(metadata, "total_tokens", 0)
-            or (input_tokens + output_tokens)
-        )
-        estimated_cost = estimate_cost_usd(model_name, input_tokens, output_tokens)
-        available = metadata is not None
-        return TokenUsage(
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            total_tokens=total_tokens,
-            estimated_cost_usd=estimated_cost,
-            usage_available=available,
         )
 
 

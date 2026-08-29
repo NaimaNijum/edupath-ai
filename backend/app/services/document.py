@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.exceptions import LLMError
 from app.database.models.entities import Document, DocumentChunk
-from app.llm.gemini import get_gemini_provider
+from app.llm.openrouter import get_openrouter_provider
 from app.repositories.document import DocumentRepository
 from app.schemas.document import DocumentRead
 
@@ -54,7 +54,7 @@ def _chunk_text(text: str, *, size: int = _CHUNK_SIZE, overlap: int = _CHUNK_OVE
 class DocumentService:
     def __init__(self, repository: DocumentRepository | None = None, provider=None) -> None:
         self._repository = repository or DocumentRepository()
-        self._provider = provider or get_gemini_provider()
+        self._provider = provider or get_openrouter_provider()
 
     async def upload(
         self, session: AsyncSession, *, profile_id: UUID, filename: str, document_type: str, raw: bytes

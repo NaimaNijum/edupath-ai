@@ -9,7 +9,7 @@ from app.schemas.agent import AgentMessage, AgentResult
 
 def build_ranking_agent(provider=None):
     """Ranking is deterministic Python scoring (see app/graph/ranking.py),
-    not an LLM call -- no provider is used, no Gemini quota is spent, and
+    not an LLM call -- no provider is used, no LLM quota is spent, and
     token usage is honestly reported as unavailable rather than zero."""
 
     def ranking_agent(state: dict) -> dict:

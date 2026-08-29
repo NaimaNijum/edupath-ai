@@ -6,26 +6,27 @@ import streamlit as st
 def render_profile_summary(profile: dict) -> None:
     """Academic profile summary as a badge/field grid. Only renders fields
     the backend actually returned."""
-    row1 = st.columns(3)
-    _field(row1[0], "Current degree", profile.get("current_degree"))
-    _field(row1[1], "Field of study", profile.get("field_of_study"))
-    _field(row1[2], "University", profile.get("university"))
+    with st.container(key="profile-summary-card", border=True):
+        row1 = st.columns(3)
+        _field(row1[0], "Current Degree", profile.get("current_degree"))
+        _field(row1[1], "Field of Study", profile.get("field_of_study"))
+        _field(row1[2], "University", profile.get("university"))
 
-    row2 = st.columns(3)
-    _field(row2[0], "GPA", profile.get("gpa"))
-    _field(row2[1], "Target degree", profile.get("target_degree"))
-    _field(row2[2], "Preferred funding", profile.get("preferred_funding"))
+        row2 = st.columns(3)
+        _field(row2[0], "GPA", profile.get("gpa"))
+        _field(row2[1], "Target Degree", profile.get("target_degree"))
+        _field(row2[2], "Preferred Funding", profile.get("preferred_funding"))
 
-    countries = profile.get("target_countries") or []
-    interests = profile.get("research_interests") or []
+        countries = profile.get("target_countries") or []
+        interests = profile.get("research_interests") or []
 
-    if countries:
-        st.markdown('<div class="ep-field-label">Target countries</div>', unsafe_allow_html=True)
-        _badge_row(countries, style="indigo")
+        if countries:
+            st.markdown('<div class="ep-field-label" style="margin-top: 0.5rem;">Target Countries</div>', unsafe_allow_html=True)
+            _badge_row(countries, style="indigo")
 
-    if interests:
-        st.markdown('<div class="ep-field-label">Research interests</div>', unsafe_allow_html=True)
-        _badge_row(interests, style="purple")
+        if interests:
+            st.markdown('<div class="ep-field-label" style="margin-top: 0.5rem;">Research Interests</div>', unsafe_allow_html=True)
+            _badge_row(interests, style="purple")
 
 
 def _field(column, label: str, value: object) -> None:

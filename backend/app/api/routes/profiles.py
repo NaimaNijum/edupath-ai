@@ -36,6 +36,18 @@ async def create_profile(
         raise HTTPException(status_code=409, detail="A profile with this email already exists") from exc
 
 
+@router.get("/me", response_model=StudentProfileRead | None)
+async def get_my_profile(
+    session: AsyncSession = Depends(get_db),
+    service: ProfileService = Depends(get_profile_service),
+    current_user: User | None = Depends(get_current_user_optional),
+) -> StudentProfileRead | None:
+    if current_user is None:
+        return None
+    profile = await service.get_for_user(session, current_user.id, current_user.email)
+    return profile
+
+
 @router.get("/{profile_id}", response_model=StudentProfileRead)
 async def get_profile(
     profile_id: UUID,

@@ -9,6 +9,7 @@ import pytest
 
 from app.schemas.agent import AgentMessage, AgentResult
 from app.schemas.workflow import WorkflowCreateRequest
+from app.services.profile import ProfileService
 from app.services.workflow import WorkflowNotResumableError, WorkflowService
 
 
@@ -274,5 +275,123 @@ async def test_workflow_service_resume_rejects_when_not_awaiting_approval() -> N
 
     with pytest.raises(WorkflowNotResumableError):
         await service.resume(session, repository.created.id, decision="approve", opportunity_id=None)
+
+
+class FakeGraphWithCandidates(FakeGraph):
+    def invoke(self, state: dict) -> dict:
+        result = super().invoke(state)
+        from app.schemas.opportunity_candidate import CandidateOpportunity
+        result["candidate_opportunities"] = [
+            CandidateOpportunity(id="c1", title="Example PhD", university="Example University", created_by="test")
+        ]
+        return result
+
+
+class SpyCatalogSyncService:
+    def __init__(self) -> None:
+        self.synced_candidates = None
+
+    async def sync_candidates_to_catalog(self, session, candidates):
+        self.synced_candidates = list(candidates)
+
+
+@pytest.mark.asyncio
+async def test_workflow_service_syncs_discovered_candidates_into_catalog() -> None:
+    """Regression test for the core sync bug: discovered candidates must be
+    handed to CatalogSyncService, not left stranded in the workflow-only
+    response -- otherwise the Catalog/Dashboard never reflect what a
+    discovery run found."""
+    graph = FakeGraphWithCandidates()
+    repository = FakeRepository()
+    catalog_sync = SpyCatalogSyncService()
+    service = WorkflowService(
+        repository=repository, graph=graph, memory_service=FakeMemoryService(),
+        tooling_service=FakeToolingService(), catalog_sync_service=catalog_sync,
+    )
+    session = SimpleNamespace()
+
+    await service.execute(session, WorkflowCreateRequest(user_request="Find me a PhD.", student_profile_id=None))
+
+    assert catalog_sync.synced_candidates is not None
+    assert len(catalog_sync.synced_candidates) == 1
+    assert catalog_sync.synced_candidates[0].title == "Example PhD"
+
+
+@pytest.mark.asyncio
+async def test_workflow_service_skips_catalog_sync_when_no_candidates() -> None:
+    graph = FakeGraph()  # base FakeGraph returns no candidate_opportunities key
+    repository = FakeRepository()
+    catalog_sync = SpyCatalogSyncService()
+    service = WorkflowService(
+        repository=repository, graph=graph, memory_service=FakeMemoryService(),
+        tooling_service=FakeToolingService(), catalog_sync_service=catalog_sync,
+    )
+    session = SimpleNamespace()
+
+    await service.execute(session, WorkflowCreateRequest(user_request="Simple request.", student_profile_id=None))
+
+    assert catalog_sync.synced_candidates is None
+
+
+def test_counseling_schema_accepts_analysis_payload() -> None:
+    from app.schemas.counseling import CounselingAnalyzeRequest
+
+    payload = CounselingAnalyzeRequest(
+        user_request="I want a funded PhD in AI in the USA.",
+        student_profile_id="d5f2d2d9-0d0a-4a0a-9ddb-4ac8da94d57a",
+    )
+
+    assert payload.user_request == "I want a funded PhD in AI in the USA."
+    assert payload.student_profile_id == "d5f2d2d9-0d0a-4a0a-9ddb-4ac8da94d57a"
+
+
+def test_counseling_response_keeps_full_workflow_payload() -> None:
+    from app.schemas.counseling import CounselingAnalyzeResponse
+
+    result = CounselingAnalyzeResponse(
+        workflow_id="wf-123",
+        workflow_status="completed",
+        workflow_type="opportunity_discovery",
+        execution_plan=["profile_agent", "ranking_agent"],
+        agent_results=[
+            {
+                "agent_name": "profile_agent",
+                "summary": "Profile matched.",
+                "supervisor_message": "Ready.",
+            }
+        ],
+        final_response="Found a strong fit.",
+        status="completed",
+    )
+
+    assert result.workflow_type == "opportunity_discovery"
+    assert result.execution_plan == ["profile_agent", "ranking_agent"]
+    assert result.agent_results[0].agent_name == "profile_agent"
+    assert result.final_response == "Found a strong fit."
+
+
+@pytest.mark.asyncio
+async def test_profile_service_get_for_user_returns_matching_profile_by_email() -> None:
+    profile = SimpleNamespace(
+        id=UUID("22222222-2222-2222-2222-222222222222"),
+        user_id=UUID("33333333-3333-3333-3333-333333333333"),
+        email="student@example.com",
+        name="Student Name",
+        field_of_study="Computer Science",
+    )
+
+    class FakeProfileRepository:
+        async def get_by_user_id(self, session, user_id):
+            return profile if user_id == profile.user_id else None
+
+        async def get_by_email(self, session, email):
+            return profile if email == profile.email else None
+
+    service = ProfileService(repository=FakeProfileRepository())
+    result = await service.get_for_user(SimpleNamespace(), UUID("33333333-3333-3333-3333-333333333333"), "student@example.com")
+
+    assert result is not None
+    assert result.email == "student@example.com"
+    assert result.name == "Student Name"
 
 

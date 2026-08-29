@@ -22,12 +22,7 @@ def serialize_usage(usage: Any) -> dict[str, float | int | bool]:
     return dict(vars(usage))
 
 
-_MODEL_PRICING = {
-    "gemini-2.5-flash-lite": {
-        "input_per_1m": 0.10,
-        "output_per_1m": 0.40,
-    },
-}
+_MODEL_PRICING: dict[str, dict[str, float]] = {}
 
 
 def estimate_cost_usd(model_name: str, input_tokens: int, output_tokens: int) -> float:

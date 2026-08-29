@@ -24,7 +24,7 @@ class UniversitySearchTool:
                     retrieved_at=datetime.now(UTC),
                     confidence=0.8,
                 ),
-                metadata={"country": university.country},
+                metadata={"country": university.country, "faculty_directory_url": university.faculty_directory_url},
             )
             for university in universities
         ]

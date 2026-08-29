@@ -7,20 +7,20 @@ from datetime import UTC, datetime
 from app.core.config import settings
 from app.core.exceptions import LLMQuotaError
 from app.core.logging import get_logger
-from app.llm.gemini import LLMCallContext
+from app.llm.base import LLMCallContext
 from app.schemas.opportunity_candidate import CandidateOpportunity, Evidence
 
 _logger = get_logger(component="workflow_budget")
 
 
 def ensure_llm_budget(state: dict, *, agent_name: str, purpose: str) -> tuple[int, LLMCallContext]:
-    """Reserve the next Gemini call slot for this workflow run.
+    """Reserve the next LLM generation call slot for this workflow run.
 
     Returns ``(call_number, call_context)`` for the caller to pass into the
     provider call and to persist back onto ``state["llm_call_count"]``.
-    Raises ``LLMQuotaError`` (without contacting Gemini) once the workflow has
-    already made ``settings.max_llm_calls_per_workflow`` calls, so a looping
-    or overly broad plan cannot keep burning quota indefinitely.
+    Raises ``LLMQuotaError`` (without contacting the provider) once the
+    workflow has already made ``settings.max_llm_calls_per_workflow`` calls,
+    so a looping or overly broad plan cannot keep burning quota indefinitely.
     """
     workflow_id = state.get("workflow_id")
     call_number = int(state.get("llm_call_count", 0)) + 1
@@ -36,13 +36,13 @@ def ensure_llm_budget(state: dict, *, agent_name: str, purpose: str) -> tuple[in
             budget=budget,
         )
         raise LLMQuotaError(
-            f"Workflow reached the per-run budget of {budget} Gemini calls.",
-            provider="gemini",
-            model=settings.gemini_model,
+            f"Workflow reached the per-run budget of {budget} LLM calls.",
+            provider="openrouter",
+            model=settings.openrouter_model,
             status_code=429,
             retry_after=None,
             quota_message=(
-                f"Per-workflow LLM call budget ({budget}) exhausted before contacting Gemini."
+                f"Per-workflow LLM call budget ({budget}) exhausted before contacting the provider."
             ),
         )
 
@@ -72,6 +72,15 @@ insufficient, say verification is required.
 
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+# Tool names whose results represent a discovered person (professor), as
+# opposed to a university/program/opportunity.
+_PROFESSOR_TOOL_NAMES = {"professor_search", "faculty_directory_search"}
+
+_SOURCE_TYPE_BY_TOOL_SOURCE = {
+    "postgresql": "database",
+    "official_website": "official_university",
+}
 
 
 def _slugify(text: str) -> str:
@@ -114,7 +123,7 @@ def candidates_from_tool_results(state: dict, tool_names: set[str], created_by: 
                     university=university,
                     degree_level=metadata.get("degree_level"),
                     country=metadata.get("country"),
-                    professor_name=title if tool_result.get("tool_name") == "professor_search" else None,
+                    professor_name=title if tool_result.get("tool_name") in _PROFESSOR_TOOL_NAMES else None,
                     research_areas=research_areas,
                     funding_type=metadata.get("funding_type"),
                     deadline=metadata.get("deadline"),
@@ -124,7 +133,7 @@ def candidates_from_tool_results(state: dict, tool_names: set[str], created_by: 
                             claim=result.get("description") or title,
                             source_url=source.get("url"),
                             source_title=title,
-                            source_type="database" if source.get("source") == "postgresql" else "web_search",
+                            source_type=_SOURCE_TYPE_BY_TOOL_SOURCE.get(source.get("source"), "web_search"),
                             verified=bool(source.get("url")),
                             retrieved_at=retrieved_at,
                         )

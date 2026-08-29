@@ -44,7 +44,7 @@ class EduPathState(TypedDict, total=False):
     execution_plan: list[str]
     plan_index: int
     next_agent: str
-    # Total Gemini generateContent calls made so far in this workflow run,
+    # Total LLM generation calls made so far in this workflow run,
     # enforced against settings.max_llm_calls_per_workflow.
     llm_call_count: int
     workflow_status: str

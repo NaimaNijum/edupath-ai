@@ -97,21 +97,31 @@ No API keys or OAuth secrets belong in this app — those stay in `backend/.env`
 
 ```bash
 # 1. Backend (separate terminal)
+cd ~/Projects/dev/edupath-ai
+docker compose -f infrastructure/docker/compose.yaml up -d
 cd backend
-docker compose -f ../infrastructure/docker/compose.yaml up -d
 uv run alembic upgrade head
 uv run python scripts/seed_catalog.py
 uv run fastapi dev app/main.py
 
-# 2. Frontend
+# 2. Frontend (another terminal)
 cd streamlit_app
-python3 -m venv .venv
+uv venv
 source .venv/bin/activate
-pip install -r requirements.txt
-streamlit run app.py
+uv pip install -r requirements.txt
+uv run streamlit run app.py
 ```
 
 Then open http://localhost:8501.
+
+If you already created the frontend virtual environment, run only:
+
+```bash
+cd ~/Projects/dev/edupath-ai/streamlit_app
+source .venv/bin/activate
+uv pip install -r requirements.txt
+uv run streamlit run app.py
+```
 
 ## Notes
 

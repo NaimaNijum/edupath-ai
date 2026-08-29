@@ -10,7 +10,7 @@ from app.graph.routing import (
     ensure_approval_gate,
     synthesize_final_response,
 )
-from app.llm.gemini import get_gemini_provider
+from app.llm.openrouter import get_openrouter_provider
 from app.schemas.agent import AgentMessage, SupervisorDecision
 
 
@@ -19,8 +19,8 @@ def _dump(value):
 
 
 def build_supervisor_agent(provider=None):
-    """The graph's sole Gemini-backed supervisor implementation."""
-    provider = provider or get_gemini_provider()
+    """The graph's supervisor implementation."""
+    provider = provider or get_openrouter_provider()
 
     def supervisor_agent(state: dict) -> dict:
         request = state.get("user_request") or state.get("user_input", "")
@@ -48,12 +48,9 @@ def build_supervisor_agent(provider=None):
         errors = state.get("errors", [])
 
         if existing_plan:
-            # The plan was already decided (by Gemini, or the deterministic
-            # fallback) on the first supervisor turn. Reuse it instead of
-            # asking Gemini to re-derive the same plan on every step: that
-            # redundant re-planning call was the single largest source of
-            # wasted Gemini quota in this workflow (N steps -> N supervisor
-            # calls, all returning an identical plan).
+            # The plan was already decided on the first supervisor turn. Reuse
+            # it instead of re-deriving the same plan on every step, which would
+            # burn unnecessary LLM quota.
             plan = existing_plan
             reason = f"Continuing the existing plan at step {plan_index + 1}/{len(plan)}."
         else:
@@ -83,10 +80,10 @@ MEMORY: {json.dumps(state.get('memory_references', []), default=str)}"""
                 raise
             except LLMError as exc:
                 # Provider failure is visible to callers; this constrained fallback
-                # keeps the workflow operable without pretending Gemini decided.
+                # keeps the workflow operable without pretending the model decided.
                 plan = build_execution_plan(request)
-                reason = "Gemini unavailable; using safe fallback plan."
-                errors = errors + [f"Supervisor Gemini failure: {exc}"]
+                reason = "Provider unavailable; using safe fallback plan."
+                errors = errors + [f"Supervisor provider failure: {exc}"]
 
             # Applied exactly once, here, when the plan is first established --
             # never on later reuse turns, since plan_index indexes into

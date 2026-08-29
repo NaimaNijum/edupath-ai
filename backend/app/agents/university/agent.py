@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from app.agents.context import candidates_from_tool_results, ensure_llm_budget, grounded_context
 from app.core.config import settings
 from app.core.exceptions import LLMError, LLMQuotaError
-from app.llm.gemini import get_gemini_provider
+from app.llm.openrouter import get_openrouter_provider
 from app.llm.usage import serialize_usage
 from app.schemas.agent import AgentMessage, AgentResult
 
@@ -22,7 +22,7 @@ class UniversityAgentOutput(BaseModel):
 
 
 def build_university_agent(provider=None):
-    provider = provider or get_gemini_provider()
+    provider = provider or get_openrouter_provider()
 
     def university_agent(state: dict) -> dict:
         user_request = state.get("user_request") or state.get("user_input", "")
@@ -56,7 +56,7 @@ Return JSON with summary, key_findings, recommended_next_agent, supervisor_messa
             structured, raw_result = provider.generate_structured(
                 prompt,
                 response_model=UniversityAgentOutput,
-                model=settings.gemini_model,
+                model=settings.openrouter_model,
                 context=call_context,
             )
         except LLMQuotaError:

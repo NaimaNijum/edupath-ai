@@ -11,6 +11,47 @@ _ELIGIBILITY_STYLE = {
     "unknown": "neutral",
 }
 
+_SCORE_LABELS = {
+    "research_match": "Research Match",
+    "eligibility": "Eligibility",
+    "funding": "Funding",
+    "professor_match": "Professor Match",
+    "university_tier": "University Tier",
+    "deadline_urgency": "Deadline Urgency",
+}
+
+
+def _tier_label(overall_score: float | None) -> tuple[str, str]:
+    """Returns (tier_name, tier_css_class)."""
+    if overall_score is None:
+        return ("—", "neutral")
+    pct = overall_score * 100
+    if pct >= 82:
+        return ("Reach", "reach")
+    if pct >= 62:
+        return ("Target", "target")
+    return ("Safe", "safe")
+
+
+def _score_bars_html(score_breakdown: dict) -> str:
+    rows = ""
+    for key, label in _SCORE_LABELS.items():
+        score = score_breakdown.get(key)
+        if score is None:
+            continue
+        pct = round(score * 100)
+        color = "#16A34A" if pct >= 75 else "#4F46E5" if pct >= 50 else "#F59E0B"
+        rows += f"""
+        <div class="ep-score-bar-row">
+          <span class="ep-score-bar-label">{label}</span>
+          <div class="ep-score-bar-track">
+            <div class="ep-score-bar-fill" style="width:{pct}%;background:{color};"></div>
+          </div>
+          <span class="ep-score-bar-value">{pct}%</span>
+        </div>
+        """
+    return rows
+
 
 def render_ranked_opportunity_card(
     candidate: dict,
@@ -22,49 +63,103 @@ def render_ranked_opportunity_card(
     selectable: bool = False,
 ) -> bool:
     """Renders one CandidateOpportunity enriched with its real verdicts.
-    Returns True if `selectable` and the user picked this one (radio)."""
+    Returns True if `selectable` and the user picked this one (checkbox).
+    """
     selected = False
-    with st.container(key=f"ranked-card-{key}", border=False):
+    with st.container(key=f"ranked-card-{key}", border=True):
         title = candidate.get("title") or "Untitled opportunity"
-        if ranked:
-            title = f"#{ranked['rank']} {title}"
-        st.markdown(f'<div class="ep-opp-title">{title}</div>', unsafe_allow_html=True)
+        rank_str = f"#{ranked['rank']} " if ranked else ""
 
+        # Title row with tier badge
+        overall_score = (ranked or {}).get("overall_score")
+        tier_name, tier_cls = _tier_label(overall_score)
+        overall_pct = round(overall_score * 100) if overall_score is not None else None
+        overall_str = f"{overall_pct}%" if overall_pct is not None else ""
+
+        col_title, col_score = st.columns([4, 1])
+        with col_title:
+            st.markdown(
+                f'<div class="ep-opp-title">{rank_str}{title}</div>',
+                unsafe_allow_html=True,
+            )
+        with col_score:
+            if overall_str:
+                st.markdown(
+                    f"""
+                    <div style="text-align:right;">
+                      <div class="ep-score-big">{overall_str}</div>
+                      <span class="ep-tier-badge {tier_cls}">{tier_name}</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        # University / professor meta
         meta = [bit for bit in (candidate.get("university"), candidate.get("professor_name")) if bit]
         if meta:
-            st.markdown(f'<div class="ep-opp-meta">{" · ".join(meta)}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="ep-opp-meta">{" · ".join(meta)}</div>',
+                unsafe_allow_html=True,
+            )
 
+        # Badges
         badges = []
         if candidate.get("country"):
             badges.append(f'<span class="ep-badge indigo">{candidate["country"]}</span>')
         if candidate.get("degree_level"):
             badges.append(f'<span class="ep-badge purple">{candidate["degree_level"]}</span>')
         if candidate.get("funding_type"):
-            badges.append(f'<span class="ep-badge success">{candidate["funding_type"]}</span>')
-        if ranked is not None:
-            badges.append(f'<span class="ep-badge indigo">{round(ranked["overall_score"] * 100)}% Overall</span>')
+            funding = candidate["funding_type"]
+            funding_style = "success" if "full" in funding.lower() else "warning"
+            badges.append(f'<span class="ep-badge {funding_style}">{funding}</span>')
         if eligibility is not None:
-            style = _ELIGIBILITY_STYLE.get(eligibility.get("eligible"), "neutral")
-            badges.append(f'<span class="ep-badge {style}">{(eligibility.get("eligible") or "").replace("_", " ").title()}</span>')
+            elig_key = eligibility.get("eligible") or eligibility.get("verdict") or "unknown"
+            style = _ELIGIBILITY_STYLE.get(elig_key, "neutral")
+            badges.append(
+                f'<span class="ep-badge {style}">{elig_key.replace("_", " ").title()}</span>'
+            )
         if badges:
-            st.markdown(f'<div class="ep-badge-row">{"".join(badges)}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="ep-badge-row">{"".join(badges)}</div>',
+                unsafe_allow_html=True,
+            )
 
+        # Research match explanation
         if research_match and research_match.get("explanation"):
-            st.caption(research_match["explanation"])
+            st.caption(research_match["explanation"][:150])
 
-        with st.expander("Evidence & details", icon=":material/fact_check:"):
-            if ranked and ranked.get("score_breakdown"):
-                st.markdown("**Score breakdown**")
-                for component, score in ranked["score_breakdown"].items():
-                    st.caption(f"{component.replace('_', ' ').title()}: {score:.2f}")
-            if eligibility and eligibility.get("explanation"):
-                st.markdown(f"**Eligibility:** {eligibility['explanation']}")
-            st.markdown("**Evidence**")
-            render_evidence_list(candidate.get("evidence") or [])
-            if candidate.get("official_url"):
-                st.link_button("Official Link", candidate["official_url"], use_container_width=True)
+        # Score breakdown
+        score_breakdown = (ranked or {}).get("component_scores") or (ranked or {}).get("score_breakdown") or {}
+        if score_breakdown:
+            with st.expander("Score breakdown & evidence", icon=":material/bar_chart:"):
+                bars_html = _score_bars_html(score_breakdown)
+                if bars_html:
+                    st.markdown(
+                        f'<div class="ep-score-breakdown">{bars_html}</div>',
+                        unsafe_allow_html=True,
+                    )
+
+                if eligibility and eligibility.get("explanation"):
+                    st.markdown(f"**Eligibility:** {eligibility['explanation']}")
+                if eligibility and eligibility.get("reasoning"):
+                    st.caption(eligibility["reasoning"][:200])
+
+                evidence = candidate.get("evidence") or []
+                if evidence:
+                    st.markdown("**Sources**")
+                    render_evidence_list(evidence)
+                if candidate.get("official_url") or candidate.get("application_url"):
+                    url = candidate.get("official_url") or candidate.get("application_url")
+                    st.link_button("Official Page ↗", url, use_container_width=True)
+        else:
+            with st.expander("Evidence & details", icon=":material/fact_check:"):
+                if eligibility and eligibility.get("explanation"):
+                    st.markdown(f"**Eligibility:** {eligibility['explanation']}")
+                render_evidence_list(candidate.get("evidence") or [])
+                if candidate.get("official_url"):
+                    st.link_button("Official Link ↗", candidate["official_url"], use_container_width=True)
 
         if selectable:
-            selected = st.checkbox("Select for approval", key=f"select-{key}")
+            selected = st.checkbox("Select for SOP generation", key=f"select-{key}")
 
     return selected

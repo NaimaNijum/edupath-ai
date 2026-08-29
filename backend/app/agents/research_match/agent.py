@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from app.agents.context import ensure_llm_budget, summarize_candidates
 from app.core.config import settings
 from app.core.exceptions import LLMError, LLMQuotaError
-from app.llm.gemini import get_gemini_provider
+from app.llm.openrouter import get_openrouter_provider
 from app.llm.usage import serialize_usage
 from app.schemas.agent import AgentMessage, AgentResult
 from app.schemas.opportunity_candidate import ResearchMatchVerdict
@@ -24,7 +24,7 @@ class ResearchMatchAgentOutput(BaseModel):
 
 
 def build_research_match_agent(provider=None):
-    provider = provider or get_gemini_provider()
+    provider = provider or get_openrouter_provider()
 
     def research_match_agent(state: dict) -> dict:
         profile = state.get("profile", {})
@@ -64,7 +64,7 @@ Return JSON with summary, key_findings, recommended_next_agent, supervisor_messa
             structured, raw_result = provider.generate_structured(
                 prompt,
                 response_model=ResearchMatchAgentOutput,
-                model=settings.gemini_model,
+                model=settings.openrouter_model,
                 context=call_context,
             )
         except LLMQuotaError:

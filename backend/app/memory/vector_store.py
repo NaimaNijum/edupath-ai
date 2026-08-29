@@ -6,14 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import LLMError
-from app.llm.gemini import get_gemini_provider
+from app.llm.openrouter import get_openrouter_provider
 from app.repositories.memory import MemoryRepository
 
 
 class MemoryVectorStore:
     def __init__(self, repository: MemoryRepository | None = None, provider=None) -> None:
         self._repository = repository or MemoryRepository()
-        self._provider = provider or get_gemini_provider()
+        self._provider = provider or get_openrouter_provider()
 
     async def search_similar(
         self,

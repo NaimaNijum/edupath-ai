@@ -25,7 +25,7 @@ def ensure_approval_gate(plan: list[str]) -> list[str]:
     sop_agent, whenever sop_agent is present in the plan.
 
     This is intentionally NOT left to the LLM's own planning (approval_gate
-    is not a member of ALL_AGENTS, so Gemini can never select or misplace
+    is not a member of ALL_AGENTS, so the planner can never select or misplace
     it) -- the human-approval pause before SOP generation must be a
     structural guarantee, not a prompt-following outcome. Must be called
     exactly once, when a plan is first established, since plan_index

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +22,28 @@ class ProfileService:
     async def get(self, session: AsyncSession, profile_id: UUID) -> StudentProfileRead | None:
         profile = await self._repository.get(session, profile_id)
         return StudentProfileRead.model_validate(profile) if profile else None
+
+    async def get_for_user(self, session: AsyncSession, user_id: UUID | None, email: str | None = None) -> StudentProfileRead | None:
+        def coerce_profile(profile):
+            if profile is None:
+                return None
+            if not hasattr(profile, "created_at"):
+                profile.created_at = datetime.now(UTC)
+            if not hasattr(profile, "updated_at"):
+                profile.updated_at = datetime.now(UTC)
+            return StudentProfileRead.model_validate(profile)
+
+        if user_id is not None:
+            profile = await self._repository.get_by_user_id(session, user_id)
+            validated = coerce_profile(profile)
+            if validated is not None:
+                return validated
+        if email:
+            profile = await self._repository.get_by_email(session, email)
+            validated = coerce_profile(profile)
+            if validated is not None:
+                return validated
+        return None
 
     async def update(self, session: AsyncSession, profile_id: UUID, request: StudentProfileUpdate) -> StudentProfileRead | None:
         profile = await self._repository.get(session, profile_id)

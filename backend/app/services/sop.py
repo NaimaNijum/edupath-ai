@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.database.models.entities import SOPDocument
-from app.llm.gemini import get_gemini_provider
+from app.llm.openrouter import get_openrouter_provider
 from app.repositories.sop import SOPRepository
 from app.schemas.sop import SOPGenerateRequest, SOPResponse, SOPReviseRequest
 from app.services.document import DocumentService
@@ -27,8 +27,11 @@ def _to_response(sop: SOPDocument) -> SOPResponse:
 class SOPService:
     def __init__(self, repository: SOPRepository | None = None, provider=None, document_service: DocumentService | None = None) -> None:
         self._repository = repository or SOPRepository()
-        self._provider = provider or get_gemini_provider()
-        self._document_service = document_service or DocumentService(provider=self._provider)
+        self._provider = provider or get_openrouter_provider()
+        # DocumentService uses the LLM only for embed_text (RAG chunking),
+        # which now goes through OpenRouter as well -- it must NOT reuse
+        # self._provider if the provider instance is generation-only.
+        self._document_service = document_service or DocumentService()
 
     async def generate(self, session: AsyncSession, request: SOPGenerateRequest) -> SOPResponse:
         base_request = request.prompt or (
@@ -54,8 +57,8 @@ class SOPService:
         )
         result = self._provider.generate(
             prompt,
-            model=settings.gemini_model,
-            temperature=settings.gemini_temperature,
+            model=settings.openrouter_model,
+            temperature=settings.openrouter_temperature,
         )
 
         sop = SOPDocument(
@@ -87,8 +90,8 @@ current draft or feedback -- never invent new publications, awards, GPA, or work
 """
         result = self._provider.generate(
             prompt,
-            model=settings.gemini_model,
-            temperature=settings.gemini_temperature,
+            model=settings.openrouter_model,
+            temperature=settings.openrouter_temperature,
         )
 
         sop.content = result.text

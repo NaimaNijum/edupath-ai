@@ -63,6 +63,12 @@ class University(UUIDMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     country: Mapped[str | None] = mapped_column(String(100))
     website_url: Mapped[str | None] = mapped_column(String(512))
+    # A verified, real, individually-fetchable faculty/people directory page
+    # (distinct from website_url, which usually points at an admissions
+    # page) -- used by PageExtractorTool to discover real professors. Null
+    # when not yet verified for this university; the finder skips it
+    # gracefully rather than guessing a URL.
+    faculty_directory_url: Mapped[str | None] = mapped_column(String(512))
     description: Mapped[str | None] = mapped_column(Text)
     metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)

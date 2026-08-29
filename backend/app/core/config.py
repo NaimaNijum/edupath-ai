@@ -14,15 +14,19 @@ class Settings(BaseSettings):
 
     database_url: str
     redis_url: str
-    gemini_api_key: str
-    # These defaults are verified against the Gemini API model catalogue.
-    # Deployments may override them when their project enables different models.
-    gemini_model: str = "gemini-2.5-flash-lite"
-    embedding_model: str = "gemini-embedding-001"
+    # OpenRouter handles both text generation and embeddings.
+    embedding_model: str = "openai/text-embedding-3-small"
     embedding_dimensions: int = 1536
-    gemini_temperature: float = 0.2
-    gemini_request_timeout_seconds: float = 60.0
-    # Hard cap on Gemini generateContent calls per workflow run. The
+    # --- OpenRouter (text generation + embeddings) --------------------------
+    openrouter_api_key: str
+    # openrouter/free is an auto-router that resiliently routes each call to
+    # whichever free model is currently available, instead of pinning one
+    # model that could later be deprecated.
+    openrouter_model: str = "openrouter/free"
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_temperature: float = 0.2
+    openrouter_request_timeout_seconds: float = 60.0
+    # Hard cap on LLM generation calls per workflow run. The
     # opportunity_discovery plan needs 1 supervisor planning call + up to 8
     # agent calls (ranking_agent is deterministic Python and makes no LLM
     # call); the default leaves a little headroom while still protecting the

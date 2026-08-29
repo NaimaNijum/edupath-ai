@@ -37,6 +37,7 @@ UNIVERSITIES: list[dict] = [
         "name": "Massachusetts Institute of Technology",
         "country": "USA",
         "website_url": "https://www.eecs.mit.edu/academics/graduate-programs/",
+        "faculty_directory_url": "https://www.eecs.mit.edu/role/faculty-cs/",
         "description": "MIT's EECS department runs one of the world's largest and most research-intensive PhD programs, spanning AI, systems, theory, and hardware.",
         "program": {"name": "PhD in Electrical Engineering and Computer Science", "degree_level": "PhD", "field": "Computer Science"},
     },
@@ -44,6 +45,7 @@ UNIVERSITIES: list[dict] = [
         "name": "Stanford University",
         "country": "USA",
         "website_url": "https://cs.stanford.edu/academics/phd",
+        "faculty_directory_url": None,  # not yet verified fetchable -- skipped honestly rather than guessed
         "description": "Stanford's Computer Science PhD program is a major hub for AI/ML research (Stanford AI Lab, HAI) alongside systems, theory, and HCI.",
         "program": {"name": "PhD in Computer Science", "degree_level": "PhD", "field": "Computer Science"},
     },
@@ -51,6 +53,7 @@ UNIVERSITIES: list[dict] = [
         "name": "Carnegie Mellon University",
         "country": "USA",
         "website_url": "https://www.cs.cmu.edu/academics/doctoral",
+        "faculty_directory_url": None,  # CMU's directory is a JavaScript-rendered search widget; no static faculty listing to fetch
         "description": "CMU's School of Computer Science is consistently ranked among the top programs worldwide, with deep strength in AI, ML, and robotics.",
         "program": {"name": "PhD in Computer Science", "degree_level": "PhD", "field": "Computer Science"},
     },
@@ -58,6 +61,7 @@ UNIVERSITIES: list[dict] = [
         "name": "University of California, Berkeley",
         "country": "USA",
         "website_url": "https://www2.eecs.berkeley.edu/Programs/Grad/",
+        "faculty_directory_url": "https://www2.eecs.berkeley.edu/Faculty/Lists/CS/faculty.html",
         "description": "UC Berkeley's EECS PhD program is a leading center for AI research (BAIR), systems, and theory.",
         "program": {"name": "PhD in Electrical Engineering and Computer Sciences", "degree_level": "PhD", "field": "Computer Science"},
     },
@@ -65,6 +69,7 @@ UNIVERSITIES: list[dict] = [
         "name": "University of Washington",
         "country": "USA",
         "website_url": "https://www.cs.washington.edu/academics/phd",
+        "faculty_directory_url": "https://www.cs.washington.edu/people/faculty",
         "description": "The Allen School at the University of Washington is a top-ranked CS PhD program with major AI, systems, and HCI groups.",
         "program": {"name": "PhD in Computer Science & Engineering", "degree_level": "PhD", "field": "Computer Science"},
     },
@@ -72,6 +77,7 @@ UNIVERSITIES: list[dict] = [
         "name": "University of Toronto",
         "country": "Canada",
         "website_url": "https://web.cs.toronto.edu/graduate",
+        "faculty_directory_url": "https://web.cs.toronto.edu/people/faculty-directory",
         "description": "University of Toronto's Department of Computer Science is a global leader in deep learning research, home to the Vector Institute.",
         "program": {"name": "PhD in Computer Science", "degree_level": "PhD", "field": "Computer Science"},
     },
@@ -79,6 +85,7 @@ UNIVERSITIES: list[dict] = [
         "name": "University of Oxford",
         "country": "UK",
         "website_url": "https://www.cs.ox.ac.uk/study/phd/",
+        "faculty_directory_url": "https://www.cs.ox.ac.uk/people/faculty.html",
         "description": "Oxford's Department of Computer Science offers a DPhil (PhD) program with strengths in AI, formal methods, and systems.",
         "program": {"name": "DPhil in Computer Science", "degree_level": "PhD", "field": "Computer Science"},
     },
@@ -86,6 +93,7 @@ UNIVERSITIES: list[dict] = [
         "name": "University of Cambridge",
         "country": "UK",
         "website_url": "https://www.cst.cam.ac.uk/admissions/phd",
+        "faculty_directory_url": "https://www.cst.cam.ac.uk/people",
         "description": "Cambridge's Department of Computer Science and Technology runs a research-intensive PhD program spanning AI, systems, and security.",
         "program": {"name": "PhD in Computer Science", "degree_level": "PhD", "field": "Computer Science"},
     },
@@ -93,6 +101,7 @@ UNIVERSITIES: list[dict] = [
         "name": "ETH Zurich",
         "country": "Switzerland",
         "website_url": "https://cs.ethz.ch/studies/phd-studies.html",
+        "faculty_directory_url": None,  # host unreachable from this environment at build time
         "description": "ETH Zurich's Department of Computer Science is one of Europe's top-ranked CS PhD programs, strong across AI, systems, and theory.",
         "program": {"name": "PhD in Computer Science", "degree_level": "PhD", "field": "Computer Science"},
     },
@@ -100,6 +109,7 @@ UNIVERSITIES: list[dict] = [
         "name": "Technical University of Munich",
         "country": "Germany",
         "website_url": "https://www.in.tum.de/en/in/for-prospective-students/doctorate/",
+        "faculty_directory_url": None,  # landing page didn't yield a parseable faculty listing
         "description": "TUM's Department of Informatics offers a structured doctoral program and is a leading German university for computer science research.",
         "program": {"name": "Doctorate in Informatics", "degree_level": "PhD", "field": "Computer Science"},
     },
@@ -107,6 +117,7 @@ UNIVERSITIES: list[dict] = [
         "name": "National University of Singapore",
         "country": "Singapore",
         "website_url": "https://www.comp.nus.edu.sg/programmes/phd/",
+        "faculty_directory_url": None,  # not yet verified fetchable
         "description": "NUS School of Computing runs Southeast Asia's top-ranked computer science PhD program, with strong AI and systems research groups.",
         "program": {"name": "PhD in Computer Science", "degree_level": "PhD", "field": "Computer Science"},
     },
@@ -114,6 +125,7 @@ UNIVERSITIES: list[dict] = [
         "name": "University of Melbourne",
         "country": "Australia",
         "website_url": "https://study.unimelb.edu.au/find/courses/graduate-research/doctor-of-philosophy-computing-and-information-systems/",
+        "faculty_directory_url": None,  # not yet verified fetchable
         "description": "The University of Melbourne's School of Computing and Information Systems is Australia's top-ranked CS department for research.",
         "program": {"name": "PhD in Computing and Information Systems", "degree_level": "PhD", "field": "Computer Science"},
     },
@@ -271,6 +283,7 @@ async def seed() -> None:
                     name=entry["name"],
                     country=entry["country"],
                     website_url=entry["website_url"],
+                    faculty_directory_url=entry.get("faculty_directory_url"),
                     description=entry["description"],
                 )
                 session.add(university)
@@ -278,6 +291,7 @@ async def seed() -> None:
             else:
                 university.country = entry["country"]
                 university.website_url = entry["website_url"]
+                university.faculty_directory_url = entry.get("faculty_directory_url")
                 university.description = entry["description"]
             university_ids[entry["name"]] = university.id
 
