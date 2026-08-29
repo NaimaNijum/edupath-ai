@@ -23,12 +23,28 @@ _RESEARCH_OPTIONS = [
 
 
 def render() -> None:
+    saved = st.session_state.get("saved_opportunities", {})
+    saved_count = len(saved)
+
     render_page_header(
-        "Find Your Next Academic Opportunity",
-        "Let EduPath AI discover opportunities that match your academic profile.",
-        eyebrow="Discover",
+        "Academic Opportunities Hub",
+        "Discover global programs, match with faculty, and manage your saved bookmarks.",
+        eyebrow="Opportunities",
     )
 
+    tab_discover, tab_saved = st.tabs([
+        ":material/search: Discover Catalog",
+        f":material/bookmark: Saved Bookmarks ({saved_count})",
+    ])
+
+    with tab_discover:
+        _render_discover_tab()
+
+    with tab_saved:
+        _render_saved_tab(saved)
+
+
+def _render_discover_tab() -> None:
     profile_id = st.session_state.get("profile_id")
     if not profile_id:
         render_empty_state(
@@ -60,7 +76,7 @@ def _render_search_panel(profile_id: str) -> None:
             "What are you looking for?",
             value=st.session_state.get("last_user_request") or "",
             placeholder=_EXAMPLE_REQUEST,
-            height=100,
+            height=90,
         )
 
         with st.expander("Quick filters (optional)", icon=":material/tune:"):
@@ -115,12 +131,8 @@ def _run_workflow(profile_id: str, user_request: str) -> None:
         "workflow_type": "opportunity_discovery",
     }
 
-    with st.status("Running EduPath AI agents...", expanded=True) as status:
-        st.write(
-            "EduPath AI is coordinating several specialized agents -- profile analysis, "
-            "opportunity discovery, eligibility review, and more -- to build your results. "
-            "This step runs on the server and can take up to two minutes."
-        )
+    with st.status("Running EduPath AI multi-agent workforce...", expanded=True) as status:
+        st.write("EduPath AI is coordinating specialized agents (Profile, University, Scholarship, Eligibility, Research) to discover your best matches.")
         try:
             result = analyze_counseling(payload)
         except BackendError as error:
@@ -129,15 +141,10 @@ def _run_workflow(profile_id: str, user_request: str) -> None:
             status.update(label="Discovery failed", state="error")
             return
 
-        status.update(label="Discovery complete", state="complete")
+        status.update(label="Discovery complete!", state="complete")
 
     st.session_state["workflow_result"] = result
     st.session_state["current_workflow_id"] = result.get("workflow_id")
-    # Discovered universities/professors/opportunities are now persisted
-    # into the real catalog by the backend (CatalogSyncService) -- clear
-    # both catalog caches (this page's session_state gate and the
-    # Dashboard's TTL cache) so the very next render re-fetches and shows
-    # them, instead of silently sitting stale until a manual Refresh.
     st.session_state["opportunities"] = None
     list_opportunities_cached.clear()
     st.rerun()
@@ -181,6 +188,31 @@ def _load_catalog() -> None:
     except BackendError as error:
         st.session_state["opportunities_error"] = error
         st.session_state["opportunities"] = []
+
+
+def _render_saved_tab(saved: dict) -> None:
+    if not saved:
+        render_empty_state(
+            "No saved opportunities yet",
+            "Bookmark programs from the catalog or counseling results to view them here.",
+            icon="🔖",
+            cta_label="Explore Catalog",
+            cta_page="pages/discover.py",
+            key="saved-empty",
+        )
+        return
+
+    opportunities = list(saved.values())
+
+    header_cols = st.columns([5, 1])
+    with header_cols[1]:
+        if st.button("Clear all", icon=":material/delete_sweep:", use_container_width=True, key="clear-saved-btn"):
+            st.session_state["saved_opportunities"] = {}
+            st.session_state["application_stage"] = {}
+            st.rerun()
+
+    filtered = render_opportunity_toolbar(opportunities, state_prefix="saved")
+    render_opportunity_grid(filtered, state_prefix="saved")
 
 
 render()

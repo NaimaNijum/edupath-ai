@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-# Fields used to compute profile completion. Mirrors app.schemas.profile.
-# StudentProfileRead -- every entry here is a real, backend-defined field.
+# Fields used to compute profile completion based on historical academic background and portfolio
 _PROFILE_COMPLETION_FIELDS = (
     "name",
     "email",
@@ -13,11 +12,10 @@ _PROFILE_COMPLETION_FIELDS = (
     "university",
     "gpa",
     "graduation_year",
-    "target_degree",
-    "preferred_funding",
-    "target_countries",
     "research_interests",
     "skills",
+    "projects",
+    "work_experience",
 )
 
 

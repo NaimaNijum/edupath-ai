@@ -17,6 +17,7 @@ import streamlit as st
 from api.client import BackendError, analyze_counseling
 from components.common import render_backend_error, section_header
 from components.header import render_page_header
+from components.workflow_status import render_workflow_status
 
 _STEPS = ["Profile", "Academic", "Experience", "Preferences", "Review", "AI Analysis"]
 
@@ -410,24 +411,18 @@ def render_step_analysis() -> None:
 
     if st.session_state.get("counseling_result"):
         result = st.session_state["counseling_result"]
-        ranked = result.get("ranked_opportunities") or []
+        render_workflow_status(result)
 
-        st.success(f"Multi-agent analysis complete. Discovered {len(ranked)} ranked opportunities.", icon=":material/check_circle:")
-
-        # Transition Actions
-        col_r1, col_r2, col_r3 = st.columns(3)
+        st.write("")
+        col_r1, col_r2 = st.columns(2)
         with col_r1:
-            if st.button("View Strategic Results →", type="primary", use_container_width=True, icon=":material/dashboard:"):
-                st.switch_page("pages/discover.py")
-        with col_r2:
-            if st.button("Inspect Live Agent Trace", use_container_width=True, icon=":material/timeline:"):
-                st.switch_page("pages/agent_trace.py")
-        with col_r3:
-            if st.button("Start New Session", use_container_width=True, icon=":material/refresh:"):
+            if st.button("✦ Start New Counseling Session", type="primary", use_container_width=True, icon=":material/refresh:"):
                 del st.session_state["counseling_result"]
                 del st.session_state["counseling_step"]
                 del st.session_state["counseling_data"]
                 st.rerun()
+        with col_r2:
+            st.page_link("pages/discover.py", label="Explore Full Opportunity Catalog →", icon=":material/school:")
         return
 
     if st.session_state.get("counseling_error"):
@@ -513,6 +508,26 @@ def render_step_analysis() -> None:
 
 
 def render() -> None:
+    profile_id = st.session_state.get("profile_id")
+    profile = st.session_state.get("profile")
+
+    # Gate: Student must complete their previous academic background profile first
+    if not profile_id or not profile or not profile.get("gpa") or not profile.get("field_of_study"):
+        render_page_header(
+            "AI Counseling Session",
+            "Multi-agent academic matching, faculty discovery, and strategy planning.",
+            eyebrow="Profile Required",
+        )
+        render_empty_state(
+            "Complete Your Academic Background First",
+            "EduPath AI requires your existing academic records (GPA, major/field of study, completed degree, and skills) to match you with appropriate future programs, scholarships, and faculty advisors.",
+            icon="🧑‍🎓",
+            cta_label="Set Up Academic Profile Now →",
+            cta_page="pages/profile.py",
+            key="counseling-profile-gate",
+        )
+        return
+
     _init_wizard()
     step = st.session_state.get("counseling_step", 0)
 
@@ -520,6 +535,23 @@ def render() -> None:
         "New AI Counseling Session",
         "Guided multi-agent intake tailored to your academic background.",
         eyebrow="AI Counseling",
+    )
+
+    # Connected Student Profile Summary Banner
+    student_name = profile.get("name") or "Student"
+    gpa = profile.get("gpa") or "N/A"
+    major = profile.get("field_of_study") or "General"
+    current_deg = profile.get("current_degree") or profile.get("academic_level") or "Undergraduate"
+    _html(
+        f"""
+        <div style="background: linear-gradient(135deg, #EEF2FF 0%, #F8FAFC 100%); border: 1px solid #C7D2FE; border-radius: 12px; padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-size: 0.72rem; color: #4F46E5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Student Academic Background</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: #0F172A; margin-top: 0.15rem;">{student_name} · GPA: {gpa}/4.0 · Major: {major} · Background: {current_deg}</div>
+            </div>
+            <span class="ep-badge success" style="font-size: 0.72rem;">Academic Record Verified ✓</span>
+        </div>
+        """
     )
 
     _render_step_indicator(step)

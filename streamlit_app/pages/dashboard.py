@@ -142,8 +142,9 @@ def render() -> None:
 
 def _render_command_banner(profile: dict | None, completion: int, workflows: list[dict]) -> None:
     profile_name = (profile or {}).get("name") or "Student"
-    target_degree = (profile or {}).get("target_degree") or "Graduate Studies"
-    field_of_study = (profile or {}).get("field_of_study") or "Your Field"
+    field_of_study = (profile or {}).get("field_of_study") or "Academic Record"
+    current_degree = (profile or {}).get("current_degree") or (profile or {}).get("academic_level") or "Student Profile"
+    is_profile_ready = bool(profile and profile.get("gpa") and profile.get("field_of_study"))
 
     with st.container(key="dashboard-hero", border=False):
         c_left, c_right = st.columns([1.4, 1])
@@ -154,22 +155,32 @@ def _render_command_banner(profile: dict | None, completion: int, workflows: lis
                   <div>
                     <div class="ep-eyebrow" style="color: #A5B4FC; margin-bottom: 0.35rem;">STUDENT COMMAND CENTER</div>
                     <div class="ep-dashboard-title">{profile_name}</div>
-                    <div class="ep-dashboard-subtitle" style="color: #CBD5E1;">{field_of_study} · {target_degree}</div>
+                    <div class="ep-dashboard-subtitle" style="color: #CBD5E1;">{field_of_study} · {current_degree}</div>
                   </div>
-                  <div class="ep-dashboard-stat-pill">{completion}% Profile Strength</div>
+                  <div class="ep-dashboard-stat-pill">{completion}% Portfolio Strength</div>
                 </div>
                 """
             )
         with c_right:
             st.write("")
-            if st.button(
-                "+ Start New Counseling",
-                type="primary",
-                use_container_width=True,
-                key="hero-start-counseling-btn",
-                help="Launch the multi-agent counseling wizard",
-            ):
-                st.switch_page("pages/counseling.py")
+            if is_profile_ready:
+                if st.button(
+                    "+ Start AI Counseling",
+                    type="primary",
+                    use_container_width=True,
+                    key="hero-start-counseling-btn",
+                    help="Launch the multi-agent counseling wizard",
+                ):
+                    st.switch_page("pages/counseling.py")
+            else:
+                if st.button(
+                    "⚠️ Complete Profile to Unlock Counseling",
+                    type="primary",
+                    use_container_width=True,
+                    key="hero-complete-profile-btn",
+                    help="You must complete your profile first before counseling can run",
+                ):
+                    st.switch_page("pages/profile.py")
 
 
 def _render_student_metrics(profile: dict | None, completion: int, opportunities: list[dict], workflows: list[dict]) -> None:
@@ -254,8 +265,8 @@ def _render_current_counseling_card(workflows: list[dict]) -> None:
             if st.button("Continue Counseling →", type="primary", use_container_width=True, key="current-counseling-continue"):
                 st.switch_page("pages/counseling.py")
         with col_act2:
-            if st.button("Inspect Live Trace", use_container_width=True, key="current-counseling-trace"):
-                st.switch_page("pages/agent_trace.py")
+            if st.button("View AI Insights", use_container_width=True, key="current-counseling-trace"):
+                st.switch_page("pages/settings.py")
 
 
 def _render_profile_breakdown_card(profile: dict | None, completion: int) -> None:
