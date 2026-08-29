@@ -3,6 +3,7 @@ Dashboard — Student Personal Command Center.
 """
 from __future__ import annotations
 
+import textwrap
 import streamlit as st
 
 from api.client import BackendError, list_opportunities_cached, list_workflows
@@ -13,6 +14,11 @@ from components.metrics import metric_grid
 from components.opportunity_card import render_opportunity_card
 from components.workflow_status import render_workflow_status
 from utils.formatting import days_until, greeting_for_now, profile_completion
+
+
+def _html(content: str) -> None:
+    """Render HTML safely without markdown 4-space code block formatting."""
+    st.markdown(textwrap.dedent(content).strip(), unsafe_allow_html=True)
 
 
 def render() -> None:
@@ -142,7 +148,7 @@ def _render_command_banner(profile: dict | None, completion: int, workflows: lis
     with st.container(key="dashboard-hero", border=False):
         c_left, c_right = st.columns([1.4, 1])
         with c_left:
-            st.markdown(
+            _html(
                 f"""
                 <div class="ep-dashboard-hero-inner">
                   <div>
@@ -152,8 +158,7 @@ def _render_command_banner(profile: dict | None, completion: int, workflows: lis
                   </div>
                   <div class="ep-dashboard-stat-pill">{completion}% Profile Strength</div>
                 </div>
-                """,
-                unsafe_allow_html=True,
+                """
             )
         with c_right:
             st.write("")
@@ -213,7 +218,7 @@ def _render_current_counseling_card(workflows: list[dict]) -> None:
     is_done = status == "completed"
 
     with st.container(key="dashboard-current-counseling", border=True):
-        st.markdown(
+        _html(
             f"""
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.8rem;">
                 <div>
@@ -241,8 +246,7 @@ def _render_current_counseling_card(workflows: list[dict]) -> None:
                     <span style="color: {'#16A34A' if is_done else '#94A3B8'}; font-weight: 700;">{'✓ Completed' if is_done else '○ Ready'}</span>
                 </div>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
 
         col_act1, col_act2 = st.columns(2)
@@ -264,7 +268,7 @@ def _render_profile_breakdown_card(profile: dict | None, completion: int) -> Non
     pref_pct = 85 if pref_filled else 30
 
     with st.container(key="dashboard-profile-breakdown", border=True):
-        st.markdown(
+        _html(
             f"""
             <div style="margin-bottom: 0.75rem;">
                 <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.2rem;">
@@ -291,8 +295,7 @@ def _render_profile_breakdown_card(profile: dict | None, completion: int) -> Non
                     <div class="ep-progress-fill" style="width: {pref_pct}%;"></div>
                 </div>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
         if st.button("Complete Profile →", use_container_width=True, key="profile-breakdown-btn"):
             st.switch_page("pages/profile.py")
@@ -311,7 +314,7 @@ def _render_workforce_status_widget() -> None:
     ]
     with st.container(key="dashboard-agent-widget", border=True):
         for name, icon, desc, badge_style in agents:
-            st.markdown(
+            _html(
                 f"""
                 <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.32rem 0; border-bottom: 1px solid #F8FAFC;">
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -323,8 +326,7 @@ def _render_workforce_status_widget() -> None:
                     </div>
                     <span class="ep-badge {badge_style}" style="font-size: 0.68rem;">Ready</span>
                 </div>
-                """,
-                unsafe_allow_html=True,
+                """
             )
 
 
@@ -344,17 +346,15 @@ def _render_compact_session_row(wf: dict) -> None:
     with st.container(key=f"dash-wf-{wf_id}", border=True):
         c1, c2 = st.columns([3.8, 1.2])
         with c1:
-            st.markdown(
+            _html(
                 f"""
                 <div style="font-weight: 600; font-size: 0.88rem; color: #0F172A;">{request_preview}{'...' if len(wf.get('user_request',''))>65 else ''}</div>
                 <div style="font-size: 0.75rem; color: #64748B; margin-top: 0.2rem;">Session: {short_id} · Date: {created}</div>
-                """,
-                unsafe_allow_html=True,
+                """
             )
         with c2:
-            st.markdown(
-                f'<span class="ep-badge {status_style}" style="display: block; text-align: center; margin-bottom: 0.35rem;">{status.replace("_", " ").title()}</span>',
-                unsafe_allow_html=True,
+            _html(
+                f'<span class="ep-badge {status_style}" style="display: block; text-align: center; margin-bottom: 0.35rem;">{status.replace("_", " ").title()}</span>'
             )
             if st.button("Inspect →", key=f"view-wf-{wf_id}", use_container_width=True):
                 st.session_state["current_workflow_id"] = wf_id

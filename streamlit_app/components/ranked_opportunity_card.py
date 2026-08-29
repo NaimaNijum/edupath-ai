@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import textwrap
 import streamlit as st
 
 from components.evidence import render_evidence_list
@@ -19,6 +20,10 @@ _SCORE_LABELS = {
     "university_tier": "University Tier",
     "deadline_urgency": "Deadline Urgency",
 }
+
+
+def _html(content: str) -> None:
+    st.markdown(textwrap.dedent(content).strip(), unsafe_allow_html=True)
 
 
 def _tier_label(overall_score: float | None) -> tuple[str, str]:
@@ -78,29 +83,22 @@ def render_ranked_opportunity_card(
 
         col_title, col_score = st.columns([4, 1])
         with col_title:
-            st.markdown(
-                f'<div class="ep-opp-title">{rank_str}{title}</div>',
-                unsafe_allow_html=True,
-            )
+            _html(f'<div class="ep-opp-title">{rank_str}{title}</div>')
         with col_score:
             if overall_str:
-                st.markdown(
+                _html(
                     f"""
                     <div style="text-align:right;">
                       <div class="ep-score-big">{overall_str}</div>
                       <span class="ep-tier-badge {tier_cls}">{tier_name}</span>
                     </div>
-                    """,
-                    unsafe_allow_html=True,
+                    """
                 )
 
         # University / professor meta
         meta = [bit for bit in (candidate.get("university"), candidate.get("professor_name")) if bit]
         if meta:
-            st.markdown(
-                f'<div class="ep-opp-meta">{" · ".join(meta)}</div>',
-                unsafe_allow_html=True,
-            )
+            _html(f'<div class="ep-opp-meta">{" · ".join(meta)}</div>')
 
         # Badges
         badges = []
@@ -119,10 +117,7 @@ def render_ranked_opportunity_card(
                 f'<span class="ep-badge {style}">{elig_key.replace("_", " ").title()}</span>'
             )
         if badges:
-            st.markdown(
-                f'<div class="ep-badge-row">{"".join(badges)}</div>',
-                unsafe_allow_html=True,
-            )
+            _html(f'<div class="ep-badge-row">{"".join(badges)}</div>')
 
         # Research match explanation
         if research_match and research_match.get("explanation"):
@@ -134,10 +129,7 @@ def render_ranked_opportunity_card(
             with st.expander("Score breakdown & evidence", icon=":material/bar_chart:"):
                 bars_html = _score_bars_html(score_breakdown)
                 if bars_html:
-                    st.markdown(
-                        f'<div class="ep-score-breakdown">{bars_html}</div>',
-                        unsafe_allow_html=True,
-                    )
+                    _html(f'<div class="ep-score-breakdown">{bars_html}</div>')
 
                 if eligibility and eligibility.get("explanation"):
                     st.markdown(f"**Eligibility:** {eligibility['explanation']}")

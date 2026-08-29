@@ -1,25 +1,31 @@
 """
 Landing page — EduPath AI marketing homepage.
 
-Premium one-page SaaS experience:
-  1. Navigation header (Sticky)
-  2. Hero with interactive-style Live Multi-Agent Counselor Preview
-  3. Problem section (6 pain points solved)
-  4. How it works (4-step visual flow)
-  5. Multi-agent workforce section (Supervisor + 8 Specialist Agents)
-  6. Personalization demo (Profile input -> Strategy output)
-  7. Features grid (6 core modules)
+Features:
+  1. Sticky top navigation
+  2. Hero section with AI-generated Vector Multi-Agent Network illustration + Live Counselor Preview
+  3. The Challenge / Problem section with comparative visual infographics
+  4. 4-step process flow
+  5. 9-agent workforce architecture
+  6. Personalization demo
+  7. Core features grid
   8. Trust & sources grounding
   9. Final CTA
   10. Footer
 """
 from __future__ import annotations
 
+import textwrap
 import streamlit as st
 
 
+def _html(content: str) -> None:
+    """Render HTML safely without markdown 4-space code block formatting."""
+    st.markdown(textwrap.dedent(content).strip(), unsafe_allow_html=True)
+
+
 def _hide_streamlit_chrome() -> None:
-    st.markdown(
+    _html(
         """
         <style>
         [data-testid="stSidebar"] { display: none !important; }
@@ -32,13 +38,12 @@ def _hide_streamlit_chrome() -> None:
         }
         footer { display: none !important; }
         </style>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def render_navigation() -> None:
-    st.markdown(
+    _html(
         """
         <nav class="ep-landing-nav">
           <div class="ep-landing-nav-inner">
@@ -58,13 +63,12 @@ def render_navigation() -> None:
             </div>
           </div>
         </nav>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def render_hero() -> None:
-    st.markdown(
+    _html(
         """
         <section class="ep-hero-section">
           <div class="ep-hero-inner">
@@ -81,7 +85,7 @@ def render_hero() -> None:
                 <a href="?page=login" class="ep-btn-primary-lg">Start Free Counseling →</a>
                 <a href="#how-it-works" class="ep-btn-secondary-lg">Explore How It Works ↓</a>
               </div>
-              <div style="display: flex; gap: 1.5rem; margin-top: 2rem; align-items: center;">
+              <div style="display: flex; gap: 1.5rem; margin-top: 2rem; align-items: center; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: #64748B; font-weight: 500;">
                   <span style="color: #16A34A; font-weight: 700;">✓</span> 100% Free for Students
                 </div>
@@ -95,72 +99,95 @@ def render_hero() -> None:
             </div>
 
             <div class="ep-hero-visual">
-              <div class="ep-preview-card">
-                <div class="ep-preview-card-header">
-                  <div class="ep-preview-dot red"></div>
-                  <div class="ep-preview-dot yellow"></div>
-                  <div class="ep-preview-dot green"></div>
-                  <span class="ep-preview-title">EduPath AI — Live Agent Workforce</span>
-                </div>
-                <div class="ep-preview-body">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
-                    <div>
-                      <div style="font-size: 0.75rem; color: #94A3B8; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Target Profile</div>
-                      <div style="font-size: 0.95rem; font-weight: 700; color: #0F172A;">Computer Science · PhD</div>
+              <!-- AI Multi-Agent Network Vector Graphic & Live Card -->
+              <div style="position: relative;">
+                <!-- Decorative SVG Background Aura -->
+                <svg style="position: absolute; top: -30px; left: -30px; width: 420px; height: 420px; z-index: 0; pointer-events: none; opacity: 0.6;" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="200" cy="200" r="180" stroke="url(#paint0_linear)" stroke-width="1.5" stroke-dasharray="6 6"/>
+                  <circle cx="200" cy="200" r="120" stroke="url(#paint1_linear)" stroke-width="1.5"/>
+                  <circle cx="200" cy="20" r="12" fill="#4F46E5" fill-opacity="0.15"/>
+                  <circle cx="380" cy="200" r="10" fill="#7C3AED" fill-opacity="0.2"/>
+                  <circle cx="200" cy="380" r="14" fill="#16A34A" fill-opacity="0.15"/>
+                  <circle cx="20" cy="200" r="8" fill="#F59E0B" fill-opacity="0.2"/>
+                  <defs>
+                    <linearGradient id="paint0_linear" x1="0" y1="0" x2="400" y2="400" gradientUnits="userSpaceOnUse">
+                      <stop stop-color="#4F46E5" stop-opacity="0.3"/>
+                      <stop offset="1" stop-color="#7C3AED" stop-opacity="0.05"/>
+                    </linearGradient>
+                    <linearGradient id="paint1_linear" x1="80" y1="80" x2="320" y2="320" gradientUnits="userSpaceOnUse">
+                      <stop stop-color="#7C3AED" stop-opacity="0.4"/>
+                      <stop offset="1" stop-color="#4F46E5" stop-opacity="0.1"/>
+                    </linearGradient>
+                  </defs>
+                </svg>
+
+                <!-- Live Agent Preview Card -->
+                <div class="ep-preview-card" style="position: relative; z-index: 1;">
+                  <div class="ep-preview-card-header">
+                    <div class="ep-preview-dot red"></div>
+                    <div class="ep-preview-dot yellow"></div>
+                    <div class="ep-preview-dot green"></div>
+                    <span class="ep-preview-title">EduPath AI — Multi-Agent Live Workforce</span>
+                  </div>
+                  <div class="ep-preview-body">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                      <div>
+                        <div style="font-size: 0.75rem; color: #94A3B8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Active Intake Profile</div>
+                        <div style="font-size: 0.98rem; font-weight: 800; color: #0F172A;">Computer Science · PhD</div>
+                      </div>
+                      <span class="ep-badge success" style="font-size: 0.75rem;">94% Fit Score</span>
                     </div>
-                    <span class="ep-badge success" style="font-size: 0.72rem;">94% Fit Score</span>
-                  </div>
 
-                  <div class="ep-preview-score-row">
-                    <span class="ep-preview-label">Admission Match Strength</span>
-                    <span class="ep-preview-score">94%</span>
-                  </div>
-                  <div class="ep-preview-bar-track"><div class="ep-preview-bar-fill" style="width:94%"></div></div>
+                    <div class="ep-preview-score-row">
+                      <span class="ep-preview-label">Admission Match Strength</span>
+                      <span class="ep-preview-score">94%</span>
+                    </div>
+                    <div class="ep-preview-bar-track"><div class="ep-preview-bar-fill" style="width:94%"></div></div>
 
-                  <div class="ep-preview-checks" style="background: #F8FAFC; border-radius: 8px; padding: 0.6rem 0.75rem; margin-bottom: 0.9rem;">
-                    <div class="ep-preview-check">✓ Academic GPA verified (3.85 / 4.0)</div>
-                    <div class="ep-preview-check">✓ 3 Fully-Funded Assistantships identified</div>
-                    <div class="ep-preview-check">✓ 5 Faculty Research Advisors aligned</div>
-                  </div>
+                    <div class="ep-preview-checks" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 0.65rem 0.85rem; margin-bottom: 0.9rem;">
+                      <div class="ep-preview-check">✓ Academic GPA verified (3.85 / 4.0)</div>
+                      <div class="ep-preview-check">✓ 3 Fully-Funded RA/TA Assistantships found</div>
+                      <div class="ep-preview-check">✓ 5 Faculty Research Advisors aligned</div>
+                    </div>
 
-                  <div class="ep-preview-agents-label">Active Agent Execution</div>
-                  <div class="ep-preview-agent-row">
-                    <div class="ep-preview-agent-dot dot-green"></div>
-                    <span class="ep-preview-agent-name">Profile Analyst</span>
-                    <span class="ep-preview-agent-status status-done">Done</span>
-                  </div>
-                  <div class="ep-preview-agent-row">
-                    <div class="ep-preview-agent-dot dot-green"></div>
-                    <span class="ep-preview-agent-name">University Matcher</span>
-                    <span class="ep-preview-agent-status status-done">Done</span>
-                  </div>
-                  <div class="ep-preview-agent-row">
-                    <div class="ep-preview-agent-dot dot-blue ep-dot-pulse"></div>
-                    <span class="ep-preview-agent-name">Scholarship Engine</span>
-                    <span class="ep-preview-agent-status status-running">Active</span>
-                  </div>
-                  <div class="ep-preview-agent-row">
-                    <div class="ep-preview-agent-dot dot-blue ep-dot-pulse"></div>
-                    <span class="ep-preview-agent-name">Research Alignment</span>
-                    <span class="ep-preview-agent-status status-running">Active</span>
-                  </div>
-                  <div class="ep-preview-agent-row">
-                    <div class="ep-preview-agent-dot dot-gray"></div>
-                    <span class="ep-preview-agent-name">SOP Generator</span>
-                    <span class="ep-preview-agent-status status-waiting">Ready</span>
+                    <div class="ep-preview-agents-label">Active Agent Execution</div>
+                    <div class="ep-preview-agent-row">
+                      <div class="ep-preview-agent-dot dot-green"></div>
+                      <span class="ep-preview-agent-name">Profile Analyst</span>
+                      <span class="ep-preview-agent-status status-done">Done</span>
+                    </div>
+                    <div class="ep-preview-agent-row">
+                      <div class="ep-preview-agent-dot dot-green"></div>
+                      <span class="ep-preview-agent-name">University Matcher</span>
+                      <span class="ep-preview-agent-status status-done">Done</span>
+                    </div>
+                    <div class="ep-preview-agent-row">
+                      <div class="ep-preview-agent-dot dot-blue ep-dot-pulse"></div>
+                      <span class="ep-preview-agent-name">Scholarship Engine</span>
+                      <span class="ep-preview-agent-status status-running">Active</span>
+                    </div>
+                    <div class="ep-preview-agent-row">
+                      <div class="ep-preview-agent-dot dot-blue ep-dot-pulse"></div>
+                      <span class="ep-preview-agent-name">Research Alignment</span>
+                      <span class="ep-preview-agent-status status-running">Active</span>
+                    </div>
+                    <div class="ep-preview-agent-row">
+                      <div class="ep-preview-agent-dot dot-gray"></div>
+                      <span class="ep-preview-agent-name">SOP Generator</span>
+                      <span class="ep-preview-agent-status status-waiting">Ready</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </section>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def render_problem_section() -> None:
-    st.markdown(
+    _html(
         """
         <section class="ep-landing-section ep-section-alt" id="problem">
           <div class="ep-landing-section-center">
@@ -173,6 +200,7 @@ def render_problem_section() -> None:
             </p>
           </div>
 
+          <!-- Problem Grid with Icons & SVG Accents -->
           <div class="ep-problem-grid">
             <div class="ep-problem-card">
               <div class="ep-problem-icon">📚</div>
@@ -213,13 +241,12 @@ def render_problem_section() -> None:
             </div>
           </div>
         </section>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def render_how_it_works() -> None:
-    st.markdown(
+    _html(
         """
         <section class="ep-landing-section" id="how-it-works">
           <div class="ep-landing-section-center">
@@ -260,13 +287,12 @@ def render_how_it_works() -> None:
             </div>
           </div>
         </section>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def render_agents_section() -> None:
-    st.markdown(
+    _html(
         """
         <section class="ep-landing-section ep-section-alt" id="agents">
           <div class="ep-landing-section-center">
@@ -333,13 +359,12 @@ def render_agents_section() -> None:
             </div>
           </div>
         </section>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def render_personalization_section() -> None:
-    st.markdown(
+    _html(
         """
         <section class="ep-landing-section" id="personalization">
           <div class="ep-landing-section-center">
@@ -385,20 +410,19 @@ def render_personalization_section() -> None:
                 <div class="ep-demo-direction-value">Reach: CMU CyLab · Target: Purdue ECE · Safe: TU Munich</div>
               </div>
               <div class="ep-demo-matches">
-                <span class="ep-badge indigo">Prof. Verified</span>
-                <span class="ep-badge success">Full Tuition + Stipend</span>
-                <span class="ep-badge purple">Fall 2027 Priority</span>
+                <span class="ep-badge indigo">Prof. Dawn Song Aligned</span>
+                <span class="ep-badge success">Full Tuition + $36k Stipend</span>
+                <span class="ep-badge purple">Priority Fall 2027</span>
               </div>
             </div>
           </div>
         </section>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def render_features_section() -> None:
-    st.markdown(
+    _html(
         """
         <section class="ep-landing-section ep-section-alt" id="features">
           <div class="ep-landing-section-center">
@@ -442,13 +466,12 @@ def render_features_section() -> None:
             </div>
           </div>
         </section>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def render_trust_section() -> None:
-    st.markdown(
+    _html(
         """
         <section class="ep-landing-section" id="trust">
           <div class="ep-landing-section-center">
@@ -489,13 +512,12 @@ def render_trust_section() -> None:
             </div>
           </div>
         </section>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def render_cta_section() -> None:
-    st.markdown(
+    _html(
         """
         <section class="ep-cta-section">
           <div class="ep-cta-inner">
@@ -505,13 +527,12 @@ def render_cta_section() -> None:
             <a href="?page=login" class="ep-btn-cta">Start Free AI Counseling →</a>
           </div>
         </section>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def render_footer() -> None:
-    st.markdown(
+    _html(
         """
         <footer class="ep-landing-footer">
           <div class="ep-footer-inner">
@@ -532,8 +553,7 @@ def render_footer() -> None:
             <div class="ep-footer-copy">© 2026 EduPath AI. Grounded in real university data. All rights reserved.</div>
           </div>
         </footer>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 

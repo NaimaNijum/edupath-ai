@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import textwrap
 import streamlit as st
 
 from api.client import BackendError, dev_login, get_auth_config, get_current_user, get_my_profile, logout
 from components.common import render_backend_error
 from utils.config import BACKEND_URL
+
+
+def _html(content: str) -> None:
+    """Render HTML safely without markdown 4-space code block formatting."""
+    st.markdown(textwrap.dedent(content).strip(), unsafe_allow_html=True)
 
 
 def _clear_session_auth() -> None:
@@ -84,8 +90,7 @@ def require_auth() -> None:
 
 def render_login_gate() -> None:
     """Full-page, modern split sign-in UI."""
-    # Hide Streamlit navigation & sidebar when showing the login gate
-    st.markdown(
+    _html(
         """
         <style>
             [data-testid="stSidebar"] { display: none !important; }
@@ -94,13 +99,12 @@ def render_login_gate() -> None:
             header[data-testid="stHeader"] { display: none !important; }
             .block-container {
                 max-width: 1040px !important;
-                padding-top: 2.5rem !important;
+                padding-top: 2rem !important;
                 padding-bottom: 3.5rem !important;
                 margin: 0 auto !important;
             }
         </style>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
     # Top navigation back button
@@ -112,14 +116,14 @@ def render_login_gate() -> None:
 
     st.write("")
 
-    # Split layout: Left = Branding/Value Props, Right = Auth Card
+    # Split layout: Left = Branding & Vector Illustration, Right = Auth Card
     left_col, right_col = st.columns([1.1, 0.9], gap="large")
 
     with left_col:
-        st.markdown(
+        _html(
             """
             <div class="ep-auth-branding-panel">
-                <div class="ep-brand" style="margin-bottom: 1.5rem;">
+                <div class="ep-brand" style="margin-bottom: 1.25rem;">
                     <div class="ep-brand-mark" style="width: 42px; height: 42px; font-size: 1.2rem; border-radius: 11px;">E</div>
                     <div class="ep-brand-text">
                         <div class="ep-brand-title" style="font-size: 1.25rem; color: #0F172A; font-weight: 800;">EduPath AI</div>
@@ -131,9 +135,26 @@ def render_login_gate() -> None:
                 <h1 style="font-size: 2.1rem; font-weight: 800; color: #0B1220; line-height: 1.2; letter-spacing: -0.04em; margin-bottom: 0.9rem;">
                     Your AI-powered path to <span class="ep-gradient-text">studying abroad.</span>
                 </h1>
-                <p style="font-size: 0.95rem; color: #64748B; line-height: 1.6; margin-bottom: 1.75rem;">
+                <p style="font-size: 0.95rem; color: #64748B; line-height: 1.6; margin-bottom: 1.5rem;">
                     Connect with 9 coordinated AI agents that analyze your academic profile, discover matching programs & scholarships, and build your personalized application strategy.
                 </p>
+
+                <!-- AI Multi-Agent Network Vector SVG Infographic -->
+                <svg width="100%" height="80" viewBox="0 0 380 80" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom: 1.5rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 8px;">
+                  <line x1="60" y1="40" x2="320" y2="40" stroke="#CBD5E1" stroke-width="2" stroke-dasharray="4 4"/>
+                  <!-- Node 1 -->
+                  <circle cx="60" cy="40" r="18" fill="#EEF2FF" stroke="#4F46E5" stroke-width="2"/>
+                  <text x="60" y="44" font-size="12" text-anchor="middle" fill="#4F46E5" font-weight="bold">Profile</text>
+                  <!-- Node 2 -->
+                  <circle cx="150" cy="40" r="18" fill="#EEF2FF" stroke="#4F46E5" stroke-width="2"/>
+                  <text x="150" y="44" font-size="12" text-anchor="middle" fill="#4F46E5" font-weight="bold">Match</text>
+                  <!-- Node 3 -->
+                  <circle cx="240" cy="40" r="18" fill="#F5F3FF" stroke="#7C3AED" stroke-width="2"/>
+                  <text x="240" y="44" font-size="12" text-anchor="middle" fill="#7C3AED" font-weight="bold">Funding</text>
+                  <!-- Node 4 -->
+                  <circle cx="320" cy="40" r="18" fill="#ECFDF5" stroke="#16A34A" stroke-width="2"/>
+                  <text x="320" y="44" font-size="12" text-anchor="middle" fill="#16A34A" font-weight="bold">SOP</text>
+                </svg>
 
                 <div class="ep-auth-feature-list">
                     <div class="ep-auth-feature-item">
@@ -157,29 +178,20 @@ def render_login_gate() -> None:
                             <div class="ep-auth-feature-desc">Identify professors aligned with your specific research domain.</div>
                         </div>
                     </div>
-                    <div class="ep-auth-feature-item">
-                        <div class="ep-auth-feature-icon">📄</div>
-                        <div>
-                            <div class="ep-auth-feature-title">Tailored Statement of Purpose</div>
-                            <div class="ep-auth-feature-desc">Grounded drafting based on your actual publications, CV, and goals.</div>
-                        </div>
-                    </div>
                 </div>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
 
     with right_col:
         with st.container(key="login-auth-card", border=False):
-            st.markdown(
+            _html(
                 """
                 <div style="margin-bottom: 1.25rem;">
                     <div style="font-size: 1.4rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Sign In</div>
                     <div style="font-size: 0.85rem; color: #64748B; margin-top: 0.2rem;">Access your personalized counseling dashboard</div>
                 </div>
-                """,
-                unsafe_allow_html=True,
+                """
             )
 
             try:
@@ -197,27 +209,25 @@ def render_login_gate() -> None:
                         use_container_width=True,
                         icon=":material/login:",
                     )
-                    st.markdown(
+                    _html(
                         """
                         <div class="ep-auth-divider-isolated">
                             <span>or continue with email</span>
                         </div>
-                        """,
-                        unsafe_allow_html=True,
+                        """
                     )
                     _render_dev_login_form()
                 else:
                     _render_dev_login_form()
 
-            st.markdown(
+            _html(
                 """
                 <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #F1F5F9; text-align: center;">
                     <span style="font-size: 0.75rem; color: #94A3B8;">
                         🔒 Secure access · Grounded in verified university and scholarship data
                     </span>
                 </div>
-                """,
-                unsafe_allow_html=True,
+                """
             )
 
 
@@ -228,7 +238,7 @@ def _render_dev_login_form(*, show_backend_warning: bool = False) -> None:
             icon=":material/warning:",
         )
 
-    st.markdown(
+    _html(
         """
         <div style="background: #EEF2FF; border: 1px solid #C7D2FE; border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1.1rem;">
             <div style="font-size: 0.82rem; color: #3730A3; font-weight: 600; margin-bottom: 0.15rem;">
@@ -238,8 +248,7 @@ def _render_dev_login_form(*, show_backend_warning: bool = False) -> None:
                 Enter any email address to sign in immediately. No password required.
             </div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
     with st.form("dev_login_form", border=False):

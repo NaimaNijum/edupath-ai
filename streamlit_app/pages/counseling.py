@@ -11,8 +11,7 @@ Steps:
 """
 from __future__ import annotations
 
-import time
-
+import textwrap
 import streamlit as st
 
 from api.client import BackendError, analyze_counseling
@@ -39,6 +38,11 @@ _RESEARCH_DOMAIN_OPTIONS = [
     "Renewable Energy & Climate Tech", "Materials Science", "Computational Neuroscience",
     "Quantitative Economics & Finance", "Public Policy & Global Affairs",
 ]
+
+
+def _html(content: str) -> None:
+    """Render HTML safely without markdown 4-space code block formatting."""
+    st.markdown(textwrap.dedent(content).strip(), unsafe_allow_html=True)
 
 
 def _init_wizard() -> None:
@@ -92,7 +96,7 @@ def _render_step_indicator(current: int) -> None:
             connector_cls = "completed" if i < current else ""
             steps_html += f'<div class="ep-wizard-step-connector {connector_cls}"></div>'
     steps_html += "</div>"
-    st.markdown(steps_html, unsafe_allow_html=True)
+    _html(steps_html)
 
 
 def _nav_buttons(step: int, total: int = len(_STEPS) - 1) -> tuple[bool, bool]:
@@ -395,14 +399,13 @@ def render_step_analysis() -> None:
     session_title = f"{data.get('target_degree', 'Graduate')} in {data.get('major', 'General')} · {', '.join(data.get('target_countries', ['Global']))}"
 
     # Header
-    st.markdown(
+    _html(
         f"""
         <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;">
             <div style="font-size: 0.75rem; color: #6366F1; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Active AI Counseling Session</div>
             <div style="font-size: 1.15rem; font-weight: 800; color: #0F172A; margin-top: 0.15rem;">{session_title}</div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
     if st.session_state.get("counseling_result"):
@@ -447,7 +450,7 @@ def render_step_analysis() -> None:
         ("SOP Generator", "📄", "Application document drafting checkpoint", "○ Waiting"),
     ]
 
-    st.markdown(
+    _html(
         """
         <div class="ep-supervisor-card">
           <div class="ep-supervisor-icon">✦</div>
@@ -456,14 +459,13 @@ def render_step_analysis() -> None:
             <div class="ep-supervisor-desc">Coordinating your 8 specialist agents. Planning execution graph and evaluating data grounding.</div>
           </div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
     cols = st.columns(2)
     for i, (name, icon, desc, status_text) in enumerate(agents_info):
         with cols[i % 2]:
-            st.markdown(
+            _html(
                 f"""
                 <div class="ep-agent-status-card {'running' if i == 0 else 'waiting'}">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
@@ -475,8 +477,7 @@ def render_step_analysis() -> None:
                   </div>
                   <div style="font-size: 0.8rem; color: #64748B;">{desc}</div>
                 </div>
-                """,
-                unsafe_allow_html=True,
+                """
             )
 
     # --- Run Workflow ---

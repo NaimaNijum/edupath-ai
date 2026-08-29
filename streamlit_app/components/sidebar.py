@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import textwrap
 import streamlit as st
 
 from api.client import check_health_cached
@@ -9,10 +10,14 @@ from utils.config import BACKEND_URL
 from utils.formatting import initials
 
 
+def _html(content: str) -> None:
+    st.markdown(textwrap.dedent(content).strip(), unsafe_allow_html=True)
+
+
 def render_sidebar_brand() -> None:
     """Brand mark, shown above the auto-generated st.navigation link list."""
     with st.sidebar:
-        st.markdown(
+        _html(
             """
             <div class="ep-brand">
                 <div class="ep-brand-mark">E</div>
@@ -21,8 +26,7 @@ def render_sidebar_brand() -> None:
                     <div class="ep-brand-subtitle">AI Academic Navigator</div>
                 </div>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
 
 
@@ -46,7 +50,7 @@ def render_sidebar_footer() -> None:
             else:
                 name, sub, avatar_html = "Guest", "Not signed in", '<div class="ep-avatar">?</div>'
 
-            st.markdown(
+            _html(
                 f"""
                 <div class="ep-sidebar-card">
                     <div class="ep-user-row">
@@ -57,8 +61,7 @@ def render_sidebar_footer() -> None:
                         </div>
                     </div>
                 </div>
-                """,
-                unsafe_allow_html=True,
+                """
             )
 
         if user:
@@ -76,13 +79,12 @@ def _render_backend_status() -> None:
 
     dot_class = "online" if online else "offline"
     text = "Backend online" if online else "Backend offline"
-    st.markdown(
+    _html(
         f"""
         <div style="padding: 0.6rem 0.2rem 0 0.2rem;">
             <span class="ep-status-dot {dot_class}"></span>
             <span class="ep-sidebar-status-text">{text}</span>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
     st.caption(BACKEND_URL)

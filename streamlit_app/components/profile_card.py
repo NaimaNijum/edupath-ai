@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import textwrap
 import streamlit as st
+
+
+def _html(content: str) -> None:
+    st.markdown(textwrap.dedent(content).strip(), unsafe_allow_html=True)
 
 
 def render_profile_summary(profile: dict) -> None:
@@ -21,19 +26,19 @@ def render_profile_summary(profile: dict) -> None:
         interests = profile.get("research_interests") or []
 
         if countries:
-            st.markdown('<div class="ep-field-label" style="margin-top: 0.5rem;">Target Countries</div>', unsafe_allow_html=True)
+            _html('<div class="ep-field-label" style="margin-top: 0.5rem;">Target Countries</div>')
             _badge_row(countries, style="indigo")
 
         if interests:
-            st.markdown('<div class="ep-field-label" style="margin-top: 0.5rem;">Research Interests</div>', unsafe_allow_html=True)
+            _html('<div class="ep-field-label" style="margin-top: 0.5rem;">Research Interests</div>')
             _badge_row(interests, style="purple")
 
 
 def _field(column, label: str, value: object) -> None:
     with column:
-        st.markdown(f'<div class="ep-field-label">{label}</div>', unsafe_allow_html=True)
+        _html(f'<div class="ep-field-label">{label}</div>')
         display = value if value not in (None, "") else "—"
-        st.markdown(f'<div class="ep-field-value">{display}</div>', unsafe_allow_html=True)
+        _html(f'<div class="ep-field-value">{display}</div>')
 
 
 def _badge_row(items: list[str], *, style: str = "indigo", limit: int = 8) -> None:
@@ -42,14 +47,13 @@ def _badge_row(items: list[str], *, style: str = "indigo", limit: int = 8) -> No
     badges = "".join(f'<span class="ep-badge {style}">{item}</span>' for item in shown)
     if extra > 0:
         badges += f'<span class="ep-badge neutral">+{extra} more</span>'
-    st.markdown(f'<div class="ep-badge-row">{badges}</div>', unsafe_allow_html=True)
+    _html(f'<div class="ep-badge-row">{badges}</div>')
 
 
 def render_completion_bar(completion: int) -> None:
-    st.markdown(
+    _html(
         f"""
         <div class="ep-metric-caption" style="margin-bottom:0;">Profile completion: {completion}%</div>
         <div class="ep-progress-track"><div class="ep-progress-fill" style="width:{completion}%"></div></div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
