@@ -1,6 +1,25 @@
 # EduPath AI
 
-**An AI-powered academic opportunity discovery and application assistant.**
+<div align="center">
+
+**An AI-Powered Academic Opportunity Discovery & Multi-Agent Counseling Assistant**
+
+[![Python](https://img.shields.io/badge/Python-3.14-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-Multi--Agent-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white)](https://www.langchain.com/langgraph)
+[![OpenRouter](https://img.shields.io/badge/OpenRouter-AI%20Gateway-6366F1?style=for-the-badge&logo=openai&logoColor=white)](https://openrouter.ai/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.40+-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20%2B%20pgvector-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7%20Alpine-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-Async%202.0-D71F00?style=for-the-badge&logo=sqlalchemy&logoColor=white)](https://www.sqlalchemy.org/)
+[![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063?style=for-the-badge&logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
+[![Pytest](https://img.shields.io/badge/Tests-110%20Passed-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![uv](https://img.shields.io/badge/uv-Package%20Manager-DE5FE9?style=for-the-badge&logo=astral&logoColor=white)](https://astral.sh/uv)
+
+</div>
+
+---
 
 EduPath AI helps students discover PhD/Master's/undergraduate programs, scholarships, research
 positions, and professors that genuinely match their academic profile — then helps them draft a
@@ -222,19 +241,18 @@ can never be hallucinated. The LLM is only used to narrate/summarize what was ac
 
 The graph is a **hub-and-spoke** topology: the Supervisor is the only node with conditional
 routing, and every worker node returns to it. This is a deliberate choice over parallel fan-out —
-it keeps Gemini free-tier quota usage predictable and makes the execution trace easy to reason
+it keeps LLM API quota usage predictable and makes the execution trace easy to reason
 about. See [`docs/workflow.md`](docs/workflow.md) for the full state schema and the
 human-in-the-loop mechanics.
 
 ## Tech Stack
 
 **Backend**: Python 3.14, FastAPI, LangGraph, Pydantic, SQLAlchemy (async), PostgreSQL + pgvector,
-Redis, Alembic, `google-genai` (Gemini), `pyjwt`, `google-auth`, `pypdf`, `python-docx`,
+Redis, Alembic, OpenRouter API (`openrouter/free` + OpenAI embeddings), `pyjwt`, `google-auth`, `pypdf`, `python-docx`,
 `openpyxl`, `httpx`, `structlog`, `uv` for dependency management.
 
 **Frontend**: Streamlit, `requests`, native Streamlit theming (`.streamlit/config.toml`) + custom
-CSS design system, `st.graphviz_chart` for the execution graph — no extra visualization
-dependency.
+CSS design system.
 
 ## Project Structure
 
