@@ -24,5 +24,5 @@ async def health() -> dict:
             "status": "unhealthy",
             "service": "edupath-api",
             "database": "unhealthy",
-            "database_error": "database check failed",
+            "database_error": str(exc),
         }) from exc

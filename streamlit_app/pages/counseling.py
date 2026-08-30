@@ -15,7 +15,8 @@ import textwrap
 import streamlit as st
 
 from api.client import BackendError, analyze_counseling
-from components.common import render_backend_error, section_header
+from components.common import render_backend_error, render_html, section_header
+from components.empty_state import render_empty_state
 from components.header import render_page_header
 from components.workflow_status import render_workflow_status
 
@@ -42,8 +43,8 @@ _RESEARCH_DOMAIN_OPTIONS = [
 
 
 def _html(content: str) -> None:
-    """Render HTML safely without markdown 4-space code block formatting."""
-    st.markdown(textwrap.dedent(content).strip(), unsafe_allow_html=True)
+    """Render HTML safely via st.html without markdown code block artifacts."""
+    render_html(content)
 
 
 def _init_wizard() -> None:

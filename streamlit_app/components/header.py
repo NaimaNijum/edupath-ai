@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import textwrap
 import streamlit as st
+from components.common import render_html
 
 
 def render_page_header(title: str, subtitle: str | None = None, *, eyebrow: str | None = None) -> None:
@@ -15,7 +15,7 @@ def render_page_header(title: str, subtitle: str | None = None, *, eyebrow: str 
         {subtitle_html}
     </div>
     """
-    st.markdown(textwrap.dedent(html).strip(), unsafe_allow_html=True)
+    render_html(html)
 
 
 def render_hero(title: str, subtitle: str | None = None, *, key: str = "main") -> None:

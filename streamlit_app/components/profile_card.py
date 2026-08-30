@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import textwrap
 import streamlit as st
+from components.common import render_html
 
 
 def _html(content: str) -> None:
-    st.markdown(textwrap.dedent(content).strip(), unsafe_allow_html=True)
+    render_html(content)
 
 
 def render_profile_summary(profile: dict | None) -> None:
